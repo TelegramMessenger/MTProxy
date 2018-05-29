@@ -1,0 +1,28 @@
+to build simply run 'make'. Your binary will be objs/bin/mtproto-proxy
+
+to run mtproto-proxy:
+  1. Obtain secret, which is used to connect to telegram servers. 
+	curl -s https://digitalresistance.dog/getSecret -o proxy-secret
+
+  2. Obtail current telegram configuration. It can (rarely) change, so we encourage you to update it once per day.
+	curl -s https://digitalresistance.dog/getConfig -o proxy-multi.conf
+
+  3. Generate secret, which is used by users to connect to proxy
+	head -c 16 /dev/urandom | xxd -ps
+
+  4. Run mtproto-proxy
+        mtproto-proxy -u nobody -p 8888 -H 443 -S <secret> --aes-pwd proxy-secret proxy-multi.conf -M 1
+	where:
+          - nobody is user name. mtproto-proxy calls setuid() to drop privilegies
+          - 443 is port, used by clients to connect to proxy
+          - 8888 is local port. You can use it to get statistics from mtproto. Like wget localhost:8888/stats
+            You can only get this stat via loopback
+          - <secret> is secret generated on step 3. 
+          - proxy-secret and proxy-multi.conf are obtains on steps 1 and 2
+          - 1 is number of workers. You can increase number of workers, if you have powerful server
+          - also feel free to look on other options in mtproto-prodxy help 
+             
+
+  5. generate link tg://proxy?server=SERVER_NAME&port=443&secret=SECRET
+
+  6. enjoy
