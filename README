@@ -20,7 +20,7 @@ to run mtproto-proxy:
           - <secret> is the secret generated at step 3. 
           - proxy-secret and proxy-multi.conf are obtained at steps 1 and 2
           - 1 is the number of workers. You can increase the number of workers, if you have a powerful server
-          - also feel free to check out other options using mtproto-prodxy help 
+          - also feel free to check out other options using mtproto-proxy help 
              
 
   5. generate the  link tg://proxy?server=SERVER_NAME&port=443&secret=SECRET
