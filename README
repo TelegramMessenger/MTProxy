@@ -4,7 +4,7 @@ to run mtproto-proxy:
   1. Obtain a secret, used to connect to telegram servers. 
   curl -s https://core.telegram.org/getProxySecret -o proxy-secret
 
-  2. Obtail current telegram configuration. It can change (occasionally), so we encourage you to update it once per day.
+  2. Obtain current telegram configuration. It can change (occasionally), so we encourage you to update it once per day.
   curl -s https://core.telegram.org/getProxyConfig -o proxy-multi.conf
 
   3. Generate a secret to be used by users to connect to your proxy
