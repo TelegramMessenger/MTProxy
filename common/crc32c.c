@@ -297,6 +297,12 @@ static unsigned crc32c_table0[256] = {
 0x4a21617b, 0x9764cbc3, 0xf54642fa, 0x2803e842,
 };
 
+#define CRC32C_REFLECTED_X1023 0x7417153fll
+#define CRC32C_REFLECTED_X2047 0x1426a815ll
+#define CRC32C_REFLECTED_X4095 0xe986c148ll
+#define CRC32C_REFLECTED_X8191 0xcdc220ddll
+#define CRC32C_REFLECTED_X16383 0x1acaec54ll
+
 #ifdef __LP64__
 static unsigned crc32c_partial_sse42 (const void *data, long len, unsigned crc) {
   const char *p = data;
@@ -330,12 +336,6 @@ static unsigned crc32c_partial_sse42 (const void *data, long len, unsigned crc) 
   }
   return c;
 }
-
-#define CRC32C_REFLECTED_X1023 0x7417153fll
-#define CRC32C_REFLECTED_X2047 0x1426a815ll
-#define CRC32C_REFLECTED_X4095 0xe986c148ll
-#define CRC32C_REFLECTED_X8191 0xcdc220ddll
-#define CRC32C_REFLECTED_X16383 0x1acaec54ll
 
 static unsigned crc32c_partial_sse42_clmul (const void *data, long len, unsigned crc) {
   const char *p = data;
