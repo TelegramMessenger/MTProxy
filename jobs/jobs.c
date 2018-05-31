@@ -33,7 +33,9 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <malloc.h>
+
+#include <stdlib.h>
+
 #include <sys/syscall.h>
 #include <math.h>
 #include <linux/futex.h>
