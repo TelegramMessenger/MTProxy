@@ -1,6 +1,6 @@
-to build, simply run 'make'. Your binary will be objs/bin/mtproto-proxy
+To build, simply run 'make'. Your binary will be objs/bin/mtproto-proxy
 
-to run mtproto-proxy:
+To run mtproto-proxy:
   1. Obtain a secret, used to connect to telegram servers. 
   curl -s https://core.telegram.org/getProxySecret -o proxy-secret
 
@@ -23,8 +23,8 @@ to run mtproto-proxy:
           - also feel free to check out other options using mtproto-proxy help 
              
 
-  5. generate the  link tg://proxy?server=SERVER_NAME&port=443&secret=SECRET
+  5. Generate the link tg://proxy?server=SERVER_NAME&port=443&secret=SECRET
 
-  6.  register your proxy with @MTProxybot on Telegram.
+  6. Register your proxy with @MTProxybot on Telegram.
 
-  7. enjoy
+  7. Enjoy!
