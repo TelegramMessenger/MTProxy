@@ -31,6 +31,65 @@
 #include "common/cpuid.h"
 #include "common/kprintf.h"
 
+
+#define FASTMOV_RMI32_TO_SSE(dst, src) \
+	asm volatile ("movd %1, %0\n\t" : "=x" (dst) : "g" (src))
+
+#ifdef __LP64__
+
+#define FASTMOV_SSE_TO_LO_HI_DW(sse, lo, hi)\
+	do {\
+		uint64_t T; \
+		asm volatile ("movq %1, %0\n\t" : "=r" (T) : "x" (sse)); \
+		lo = (uint32_t) T; \
+		hi = (uint32_t) (T >> 32); \
+	} while(0)
+
+#else
+
+#define FASTMOV_SSE_TO_LO_HI_DW(sse, lo, hi)\
+	do {\
+		asm volatile ("movd %1, %0\n\t" : "=r" (lo) : "x" (sse)); \
+		sse = __builtin_ia32_psrldqi128(sse, 32); \
+		asm volatile ("movd %1, %0\n\t" : "=r" (hi) : "x" (sse)); \
+	} while(0)
+
+#endif
+
+
+#ifdef __LP64__
+
+#define RETURN_SSE_UINT64(sse)\
+	do {\
+		uint64_t T; \
+		asm volatile ("movq %1, %0\n\t" : "=r" (T) : "x" (sse)); \
+		return T; \
+	} while(0)
+
+// RMI == reg, mem, imm
+#define FASTMOV_RMI64_TO_SSE(dst, src) \
+	asm volatile ("movq %1, %0\n\t" : "=x" (dst) : "g" (src))
+
+#else
+
+#define RETURN_SSE_UINT64(sse)\
+	do {\
+		uint32_t lo, hi;\
+		FASTMOV_SSE_TO_LO_HI_DW(sse, lo, hi);\
+                uint64_t T; \
+		T = (((uint64_t)hi)<<32) | lo; \
+		return T; \
+	} while(0)
+
+#define FASTMOV_RMI64_TO_SSE(dst, src) \
+	do { \
+		uint64_t T = src; \
+		asm volatile ("movsd %1, %0\n\t" : "=x" (dst) : "m" (T)); \
+	} while(0)
+
+#endif
+
+
 static const unsigned int crc32_table[256] =
 {
   0x00000000, 0x77073096, 0xee0e612c, 0x990951ba,
@@ -440,7 +499,7 @@ unsigned crc32_partial_clmul (const void *data, long len, unsigned crc) {
 
   {
     v2di C;
-    asm volatile ("movd %1, %0\n\t" : "=x" (C)  : "g" (crc));
+    FASTMOV_RMI32_TO_SSE(C, crc);
     asm volatile ("pcmpeqw %0, %0\n\t" : "=x" (G)); //G := 2 ^ 128 - 1
 
     H = (v2di) __builtin_ia32_loaddqu (mask + o);
@@ -462,20 +521,20 @@ unsigned crc32_partial_clmul (const void *data, long len, unsigned crc) {
 
   D ^= (v2di) __builtin_ia32_pclmulqdq128 (D, CRC32_K64, 0x10);
 
-  uint64_t T;
+  unsigned lo, hi;
 #ifdef CRC32_BARRETT_REDUCTION
   H = (v2di) __builtin_ia32_punpckhdq128 ((v4si) (G ^ G), (v4si) D);
   H = (v2di) __builtin_ia32_pclmulqdq128 (H, CRC32_MU, 0x00);
   H = (v2di) __builtin_ia32_pclmulqdq128 (H, CRC32_MU, 0x10);
   D ^= __builtin_ia32_pslldqi128 (H, 32);
   D = __builtin_ia32_punpckhqdq128 (D, D);
-  asm volatile ("movq %1, %0\n\t" : "=r" (T) : "x" (D));
-  return (unsigned) (T >> 32);
+
+  FASTMOV_SSE_TO_LO_HI_DW(D, lo, hi);
+  return hi;
 #else
   D = __builtin_ia32_punpckhqdq128 (D, D);
-  asm volatile ("movq %1, %0\n\t" : "=r" (T) : "x" (D));
-  crc = (unsigned) T;
-  return crc32_table0[crc & 0xff] ^ crc32_table1[(crc & 0xff00) >> 8] ^ crc32_table2[(crc & 0xff0000) >> 16] ^ crc32_table[crc >> 24] ^ ((unsigned) (T >> 32));
+  FASTMOV_SSE_TO_LO_HI_DW(D, lo, hi);
+  return crc32_table0[lo & 0xff] ^ crc32_table1[(lo & 0xff00) >> 8] ^ crc32_table2[(lo & 0xff0000) >> 16] ^ crc32_table[lo >> 24] ^ ((unsigned) hi);
 #endif
 }
 
@@ -571,9 +630,7 @@ static uint64_t crc64_barrett_reduction (v2di D) {
   D ^= __builtin_ia32_pclmulqdq128 (E, CRC64_MU, 0x10);
   D = __builtin_ia32_punpckhqdq128 (D, D);
   D ^= E;
-  uint64_t T;
-  asm volatile ("movq %1, %0\n\t" : "=r" (T) : "x" (D));
-  return T;
+  RETURN_SSE_UINT64(D);
 }
 
 uint64_t crc64_partial_clmul (const void *data, long len, uint64_t crc) {
@@ -586,7 +643,7 @@ uint64_t crc64_partial_clmul (const void *data, long len, uint64_t crc) {
   int o = (int)(32 - ((uintptr_t) data & 15));
 
   v2di D = (* (v2di *) q), E = (*(v2di *)(q + 16)), C, G, H;
-  asm volatile ("movq %1, %0\n\t" : "=x" (C)  : "g" (crc));
+  FASTMOV_RMI64_TO_SSE(C, crc);
   asm volatile ("pcmpeqw %0, %0\n\t" : "=x" (G)); //G := 2 ^ 128 - 1
 
   H = (v2di) __builtin_ia32_loaddqu (mask + o);
@@ -701,7 +758,7 @@ unsigned gf32_combine_generic (unsigned *powers, unsigned crc1, int64_t len2) {
 
 uint64_t gf32_combine_clmul (unsigned *powers, unsigned crc1, int64_t len2) {
   v2di D;
-  asm volatile ("movd %1, %0\n\t" : "=x" (D)  : "g" (crc1));
+  FASTMOV_RMI32_TO_SSE(D, crc1);
   D = __builtin_ia32_pslldqi128 (D, 96);
 
   int n = __builtin_ffsll (len2);
@@ -721,9 +778,7 @@ uint64_t gf32_combine_clmul (unsigned *powers, unsigned crc1, int64_t len2) {
 
   D ^= (v2di) __builtin_ia32_pclmulqdq128 (* ((v2di *) (powers + 12)), D, 0x01);
   D = __builtin_ia32_punpckhqdq128 (D, D);
-  uint64_t T;
-  asm volatile ("movq %1, %0\n\t" : "=r" (T) : "x" (D));
-  return T;
+  RETURN_SSE_UINT64(D);
 }
 
 /* }}} */
@@ -827,7 +882,7 @@ static uint64_t compute_crc64_combine_clmul (uint64_t crc1, uint64_t crc2, int64
     crc64_init_power_buf ();
   }
   v2di D;
-  asm volatile ("movq %1, %0\n\t" : "=x" (D)  : "g" (crc1));
+  FASTMOV_RMI64_TO_SSE(D, crc1);
   D = __builtin_ia32_pslldqi128 (D, 64);
 
   int n = __builtin_ffsll (len2);

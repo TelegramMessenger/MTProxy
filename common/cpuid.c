@@ -30,10 +30,17 @@ kdb_cpuid_t *kdb_cpuid (void) {
     return &cached;
   }
   int a;
+  #if ( __GNUC__ < 5 ) && defined( __i386__ ) && defined( __PIC__ )
+  asm volatile ("cpuid\n\t"
+      : "=a" (a), "=D" (cached.ebx) , "=c" (cached.ecx), "=d" (cached.edx)
+      : "0" (1)
+      );
+  #else
   asm volatile ("cpuid\n\t"
       : "=a" (a), "=b" (cached.ebx) , "=c" (cached.ecx), "=d" (cached.edx)
       : "0" (1)
       );
+  #endif
   cached.magic = CPUID_MAGIC;
   return &cached;
 }
