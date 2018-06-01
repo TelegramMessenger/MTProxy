@@ -31,8 +31,8 @@ kdb_cpuid_t *kdb_cpuid (void) {
   }
   int a;
   #if ( __GNUC__ < 5 ) && defined( __i386__ ) && defined( __PIC__ )
-  asm volatile ("cpuid\n\t"
-      : "=a" (a), "=D" (cached.ebx) , "=c" (cached.ecx), "=d" (cached.edx)
+  asm volatile ("xchgl\t%%ebx, %1\n\tcpuid\n\txchgl\t%%ebx, %1\n\t"
+      : "=a" (a), "=r" (cached.ebx), "=c" (cached.ecx), "=d" (cached.edx)  
       : "0" (1)
       );
   #else
