@@ -237,9 +237,7 @@ static int tcp_rpcs_process_nonce_packet (connection_job_t C, struct raw_message
 static int tcp_rpcs_send_handshake_packet (connection_job_t c) {
   struct tcp_rpc_data *D = TCP_RPC_DATA(c);
   struct tcp_rpc_handshake_packet P;
-  if (!PID.ip) {
-    PID.ip = get_my_ipv4 ();
-  }
+  assert(PID.ip);
   memset (&P, 0, sizeof (P));
   P.type = RPC_HANDSHAKE;
   P.flags = D->crypto_flags & RPCF_USE_CRC32C;
