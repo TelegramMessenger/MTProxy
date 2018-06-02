@@ -32,8 +32,17 @@ kdb_cpuid_t *kdb_cpuid (void) {
     assert (cached.magic == CPUID_MAGIC);
     return &cached;
   }
-  int a;
-  assert(__get_cpuid(1, &a, &cached.ebx, &cached.ecx, &cached.edx) != 0);
+
+  unsigned int a;
+  assert(
+    __get_cpuid(1,
+        &a,
+        (unsigned int*) &cached.ebx,
+        (unsigned int*) &cached.ecx,
+        (unsigned int*) &cached.edx
+    ) != 0
+  );
+
   cached.magic = CPUID_MAGIC;
   return &cached;
 }
