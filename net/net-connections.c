@@ -2178,3 +2178,28 @@ unsigned nat_translate_ip (unsigned local_ip) {
   }
   return local_ip;
 }
+
+int ipv4_address_is_private(unsigned int ipv4) {
+  int ipv4_part1 = ipv4 >> 24 & 255;
+  int ipv4_part2 = ipv4 >> 16 & 255;
+
+  // RFC 1918
+  // check private address range 
+  // 10.0.0.0 - 10.255.255.255
+  if (ipv4_part1 == 10) {
+    return 1;
+  }
+
+  // 172.16.0.0 - 172.31.255.255
+  if (ipv4_part1 == 172 && ipv4_part2 >= 16 && ipv4_part2 <= 31) {
+    return 2;
+  }
+
+  // 192.168.0.0 - 192.168.255.255
+  if (ipv4_part1 == 192 && ipv4_part2 == 168) {
+    return 3;
+  }
+
+  // The address is not in private
+  return 0;
+}
