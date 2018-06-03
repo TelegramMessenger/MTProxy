@@ -19,7 +19,10 @@
 */
 
 #include <assert.h>
+#include <cpuid.h>
+
 #include "cpuid.h"
+
 
 #define CPUID_MAGIC 0x280147b8
 
@@ -29,11 +32,17 @@ kdb_cpuid_t *kdb_cpuid (void) {
     assert (cached.magic == CPUID_MAGIC);
     return &cached;
   }
-  int a;
-  asm volatile ("cpuid\n\t"
-      : "=a" (a), "=b" (cached.ebx) , "=c" (cached.ecx), "=d" (cached.edx)
-      : "0" (1)
-      );
+
+  unsigned int a;
+  assert(
+    __get_cpuid(1,
+        &a,
+        (unsigned int*) &cached.ebx,
+        (unsigned int*) &cached.ecx,
+        (unsigned int*) &cached.edx
+    ) != 0
+  );
+
   cached.magic = CPUID_MAGIC;
   return &cached;
 }

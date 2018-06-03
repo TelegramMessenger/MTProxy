@@ -243,7 +243,9 @@ static int tcp_rpcc_send_handshake_packet (connection_job_t C) /* {{{ */ {
 
   struct tcp_rpc_data *D = TCP_RPC_DATA (C);
   struct tcp_rpc_handshake_packet P;
-  assert (PID.ip);
+  if (!PID.pid) {
+    init_client_PID (c->our_ip);
+  }
   memset (&P, 0, sizeof (P));
   P.type = RPC_HANDSHAKE;
   P.flags = tcp_get_default_rpc_flags () & RPCF_USE_CRC32C;
