@@ -9,7 +9,7 @@ apt install build-essential libssl-dev zlib1g-dev
 ```
 On CentOS/RHEL:
 ```bash
-yum install openssl-devel
+yum install openssl-devel zlib-devel
 yum groupinstall "Development Tools"
 ```
 To build, simply run `make`. Your binary will be in `objs/bin/mtproto-proxy`. If build was failed, you would do `make clear` at first, before building it again.
