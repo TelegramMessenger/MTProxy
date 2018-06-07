@@ -1,7 +1,24 @@
 # MTProxy
+
+# Building
+
+Install dependencies: you'd need normal set of tools for building from
+source, and a dev package for openssl.
+
+On Ubuntu/Debian:
+```bash
+apt install build-essential libssl-dev
+```
+
+On CentOS:
+```bash
+yum install openssl-devel
+yum groupinstall "Development Tools"
+```
+
 To build, simply run `make`. Your binary will be in `objs/bin/mtproto-proxy`. If build was failed, you would do `make clear` at first, before building it again.
 
-To run `mtproto-proxy`:
+# Running
 1. Obtain a secret, used to connect to telegram servers.
 ```bash
 curl -s https://core.telegram.org/getProxySecret -o proxy-secret
