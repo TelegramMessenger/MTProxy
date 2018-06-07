@@ -1,13 +1,12 @@
 # MTProxy
 
-# Building
-
+## Building
 Install dependencies: you'd need normal set of tools for building from
 source, and a dev package for openssl.
 
 On Ubuntu/Debian:
 ```bash
-apt install build-essential libssl-dev
+apt install build-essential libssl-dev zlib1g-dev
 ```
 
 On CentOS:
@@ -18,7 +17,7 @@ yum groupinstall "Development Tools"
 
 To build, simply run `make`. Your binary will be in `objs/bin/mtproto-proxy`. If build was failed, you would do `make clear` at first, before building it again.
 
-# Running
+## Running
 1. Obtain a secret, used to connect to telegram servers.
 ```bash
 curl -s https://core.telegram.org/getProxySecret -o proxy-secret
@@ -52,7 +51,7 @@ head -c 16 /dev/urandom | xxd -ps
 ## Systemd example configuration
 1. Create systemd service file (it's standart path for the most Linux distros, but you should check it before):
 ```bash
-sudo nano /etc/systemd/system/MTProxy.service
+nano /etc/systemd/system/MTProxy.service
 ```
 2. Edit this basic service (especially paths and params):
 ```bash
@@ -71,17 +70,17 @@ WantedBy=multi-user.target
 ```
 3. Reload daemons:
 ```bash
-sudo systemctl daemon-reload
+systemctl daemon-reload
 ```
 4. Test fresh MTProxy service:
 ```bash
-sudo systemctl restart MTProxy.service
+systemctl restart MTProxy.service
 # Check status, it should be active
-sudo systemctl status MTProxy.service
+systemctl status MTProxy.service
 ```
 5. Enable it, to autostart service after reboot:
 ```bash
-sudo systemctl enable MTProxy.service
+systemctl enable MTProxy.service
 ```
 
 ## Docker image
