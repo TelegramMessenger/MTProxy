@@ -1,20 +1,16 @@
 # MTProxy
 
 ## Building
-Install dependencies: you'd need normal set of tools for building from
-source, and a dev package for openssl.
-
-On Ubuntu/Debian:
+Install dependencies, you would need common set of tools for building from source, and source packages for `openssl` and `zlib`.
+On Debian/Ubuntu:
 ```bash
 apt install build-essential libssl-dev zlib1g-dev
 ```
-
-On CentOS:
+On CentOS/RHEL:
 ```bash
 yum install openssl-devel
 yum groupinstall "Development Tools"
 ```
-
 To build, simply run `make`. Your binary will be in `objs/bin/mtproto-proxy`. If build was failed, you would do `make clear` at first, before building it again.
 
 ## Running
