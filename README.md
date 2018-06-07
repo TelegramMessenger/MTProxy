@@ -1,7 +1,7 @@
 # MTProxy
 
 ## Building
-Install dependencies, you would need common set of tools for building from source, and source packages for `openssl` and `zlib`.
+Install dependencies, you would need common set of tools for building from source, and development packages for `openssl` and `zlib`.
 
 On Debian/Ubuntu:
 ```bash
