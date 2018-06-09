@@ -243,7 +243,7 @@ static int tcp_rpcc_send_handshake_packet (connection_job_t C) /* {{{ */ {
 
   struct tcp_rpc_data *D = TCP_RPC_DATA (C);
   struct tcp_rpc_handshake_packet P;
-  if (!PID.pid) {
+  if (!PID.ip) {
     init_client_PID (c->our_ip);
   }
   memset (&P, 0, sizeof (P));
