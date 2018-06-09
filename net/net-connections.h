@@ -418,6 +418,14 @@ int get_cur_conn_generation (void);
 void tcp_set_max_accept_rate (int rate);
 void tcp_set_max_connections (int maxconn);
 
+/**
+ * Checks if the given address is in private range according to RFC 1918.
+ * @param ipv4 an integer ipv4 address (like ntohl() returns)
+ * @return a positive value 1-3 defining which subnet is it or a zero
+ *  if the address is not in private range.
+ */
+int ipv4_address_is_private(unsigned int ipv4);
+
 extern int max_special_connections, active_special_connections;
 
 #define MAX_NAT_INFO_RULES	16
