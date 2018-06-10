@@ -72,10 +72,10 @@ DEPENDENCE_ALL		:=	${DEPENDENCE_NORM} ${DEPENDENCE_STRANGE} ${DEPENDENCE_LIB}
 OBJECTS_ALL		:=	${OBJECTS} ${LIB_OBJS}
 
 all:
-	make meta-build
+	$(MAKE) meta-build
 
 debug:
-	make DEBUG="-g" meta-build
+	$(MAKE) DEBUG="-g" meta-build
 
 meta-build:	${ALLDIRS} ${EXELIST} 
 dirs: ${ALLDIRS}
