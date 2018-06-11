@@ -55,10 +55,11 @@ head -c 16 /dev/urandom | xxd -ps
 
 Also feel free to check out other options using `mtproto-proxy --help`.
 
-5. Generate the link with following schema: `tg://proxy?server=SERVER_NAME&port=PORT&secret=SECRET` (or let the official bot generate it for you).
-6. Register your proxy with [@MTProxybot](https://t.me/MTProxybot) on Telegram.
-7. Set received tag with arguments: `-P <proxy tag>`
-8. Enjoy.
+5. Close the local port (`8888` by default) in your firewall, otherwise it reveales some critical information.
+6. Generate the link with following schema: `tg://proxy?server=SERVER_NAME&port=PORT&secret=SECRET` (or let the official bot generate it for you).
+7. Register your proxy with [@MTProxybot](https://t.me/MTProxybot) on Telegram.
+8. Set received tag with arguments: `-P <proxy tag>`
+9. Enjoy.
 
 ## Systemd example configuration
 1. Create systemd service file (it's standart path for the most Linux distros, but you should check it before):
