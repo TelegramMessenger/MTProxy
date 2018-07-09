@@ -185,8 +185,17 @@ int tcp_rpc_write_packet_compact (connection_job_t C, struct raw_message *raw) {
     return tcp_rpc_write_packet (C, raw);
   }
 
+  if (TCP_RPC_DATA(C)->flags & RPC_F_PAD) {
+    int x = lrand48_j();
+    int y = lrand48_j() & 3;
+    assert (rwm_push_data (raw, &x, y) == y);
+  }
+
   int len = raw->total_bytes;
-  assert (!(len & 0xfc000003));
+  assert (!(len & 0xfc000000));
+  if (!(TCP_RPC_DATA(C)->flags & RPC_F_PAD)) {
+    assert (!(len & 3));
+  }
   if (TCP_RPC_DATA(C)->flags & RPC_F_MEDIUM) {
     rwm_push_data_front (raw, &len, 4);
   } else if (len <= 0x7e * 4) {

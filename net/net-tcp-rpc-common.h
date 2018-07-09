@@ -105,6 +105,7 @@ int tcp_rpc_default_execute (connection_job_t C, int op, struct raw_message *raw
 #define RPCF_USE_CRC32C		2048
 
 /* for flags in struct tcp_rpc_data */
+#define RPC_F_PAD       0x8000000
 #define RPC_F_DROPPED		0x10000000
 #define RPC_F_MEDIUM		0x20000000
 #define RPC_F_COMPACT		0x40000000
