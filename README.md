@@ -10,7 +10,7 @@ apt install git curl build-essential libssl-dev zlib1g-dev
 ```
 On CentOS/RHEL:
 ```bash
-yum install openssl-devel zlib-devel
+yum install openssl-devel zlib-devel vim-common
 yum groupinstall "Development Tools"
 ```
 
