@@ -16,6 +16,7 @@ yum groupinstall "Development Tools"
 
 Clone the repo:
 ```bash
+cd /opt
 git clone https://github.com/TelegramMessenger/MTProxy
 cd MTProxy
 ```
@@ -83,7 +84,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/MTProxy
-ExecStart=/opt/MTProxy/mtproto-proxy -u nobody -p 8888 -H 443 -S <secret> -P <proxy tag> <other params>
+ExecStart=/opt/MTProxy/objs/bin/mtproto-proxy -u nobody -p 8888 -H 443 -S <secret> -P <proxy tag> <other params>
 Restart=on-failure
 
 [Install]
