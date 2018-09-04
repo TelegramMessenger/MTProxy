@@ -149,6 +149,13 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
         vkprintf (1, "Medium type\n");
         continue;
       }
+      if (packet_len == 0xdddddddd) {
+        D->flags |= RPC_F_MEDIUM | RPC_F_PAD;
+        assert (rwm_skip_data (&c->in, 4) == 4);
+        D->in_packet_num = 0;
+        vkprintf (1, "Medium type\n");
+        continue;
+      }
         
       // http
       if ((packet_len == *(int *)"HEAD" || packet_len == *(int *)"POST" || packet_len == *(int *)"GET " || packet_len == *(int *)"OPTI") && TCP_RPCS_FUNC(C)->http_fallback_type) {
@@ -216,7 +223,7 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
         T->read_aeskey.type->ctr128_crypt (&T->read_aeskey, random_header, random_header, 64, T->read_iv, T->read_ebuf, &T->read_num);
         unsigned tag = *(unsigned *)(random_header + 56);
 
-        if (tag == 0xeeeeeeee || tag == 0xefefefef) {
+        if (tag == 0xdddddddd || tag == 0xeeeeeeee || tag == 0xefefefef) {
           assert (rwm_skip_data (&c->in, 64) == 64);
           rwm_union (&c->in_u, &c->in);
           rwm_init (&c->in, 0);
@@ -225,6 +232,9 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
           switch (tag) {
             case 0xeeeeeeee:
               D->flags |= RPC_F_MEDIUM | RPC_F_EXTMODE2;
+              break;
+            case 0xdddddddd:
+              D->flags |= RPC_F_MEDIUM | RPC_F_EXTMODE2 | RPC_F_PAD;
               break;
             case 0xefefefef:
               D->flags |= RPC_F_COMPACT | RPC_F_EXTMODE2;
@@ -269,10 +279,10 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
     int packet_len_bytes = 4;
     if (D->flags & RPC_F_MEDIUM) {
       // packet len in `medium` mode
-      if (D->crypto_flags & RPCF_QUICKACK) {
+      //if (D->crypto_flags & RPCF_QUICKACK) {
         D->flags = (D->flags & ~RPC_F_QUICKACK) | (packet_len & RPC_F_QUICKACK);
         packet_len &= ~RPC_F_QUICKACK;
-      }
+      //}
     } else {
       // packet len in `compact` mode
       if (packet_len & 0x80) {
@@ -295,7 +305,7 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
       packet_len <<= 2;
     }
 
-    if (packet_len <= 0 || (packet_len & 0xc0000003)) {
+    if (packet_len <= 0 || (packet_len & 0xc0000000) || (!(D->flags & RPC_F_PAD) && (packet_len & 3))) {
       vkprintf (1, "error while parsing packet: bad packet length %d\n", packet_len);
       fail_connection (C, -1);
       return 0;
@@ -317,6 +327,9 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
     int packet_type;
 
     rwm_split_head (&msg, &c->in, packet_len);
+    if (D->flags & RPC_F_PAD) {
+      rwm_trunc (&msg, packet_len & -4);
+    }
 
     assert (rwm_fetch_lookup (&msg, &packet_type, 4) == 4);
 

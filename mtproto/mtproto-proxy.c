@@ -789,11 +789,38 @@ static int _notify_remote_closed (JOB_REF_ARG(C), long long out_conn_id) {
 }
 
 void push_rpc_confirmation (JOB_REF_ARG (C), int confirm) {
-  struct raw_message *msg = malloc (sizeof (struct raw_message));
-  rwm_create (msg, "\xdd", 1);
-  rwm_push_data (msg, &confirm, 4);
-  mpq_push_w (CONN_INFO(C)->out_queue, msg, 0);
-  job_signal (JOB_REF_PASS (C), JS_RUN);
+
+  if ((lrand48_j() & 1) || !(TCP_RPC_DATA(C)->flags & RPC_F_PAD)) {
+    struct raw_message *msg = malloc (sizeof (struct raw_message));
+    rwm_create (msg, "\xdd", 1);
+    rwm_push_data (msg, &confirm, 4);
+    mpq_push_w (CONN_INFO(C)->out_queue, msg, 0);
+    job_signal (JOB_REF_PASS (C), JS_RUN);
+  } else {
+    int x = -1;
+    struct raw_message m;
+    assert (rwm_create (&m, &x, 4) == 4);
+    assert (rwm_push_data (&m, &confirm, 4) == 4);
+
+    int z = lrand48_j() & 1;
+    while (z-- > 0) {
+      int t = lrand48_j();
+      assert (rwm_push_data (&m, &t, 4) == 4);
+    }
+
+    tcp_rpc_conn_send (JOB_REF_CREATE_PASS (C), &m, 0);
+
+    x = 0;
+    assert (rwm_create (&m, &x, 4) == 4);
+
+    z = lrand48_j() & 1;
+    while (z-- > 0) {
+      int t = lrand48_j();
+      assert (rwm_push_data (&m, &t, 4) == 4);
+    }
+
+    tcp_rpc_conn_send (JOB_REF_PASS (C), &m, 0);
+  }
 }
 
 struct client_packet_info {
@@ -1645,7 +1672,7 @@ conn_target_job_t choose_proxy_target (int target_dc) {
 }
 
 static int forward_mtproto_enc_packet (struct tl_in_state *tlio_in, connection_job_t C, long long auth_key_id, int len, int remote_ip_port[5], int rpc_flags) {
-  if (len < offsetof (struct encrypted_message, message) || (len & 15) != (offsetof (struct encrypted_message, server_salt) & 15)) {
+  if (len < offsetof (struct encrypted_message, message) /*|| (len & 15) != (offsetof (struct encrypted_message, server_salt) & 15)*/) {
     return 0;
   }
   vkprintf (2, "received mtproto encrypted packet of %d bytes from connection %p (#%d~%d), key=%016llx\n", len, C, CONN_INFO(C)->fd, CONN_INFO(C)->generation, auth_key_id);
@@ -1670,11 +1697,11 @@ int forward_mtproto_packet (struct tl_in_state *tlio_in, connection_job_t C, int
   }
   vkprintf (2, "received mtproto packet of %d bytes\n", len);
   int inner_len = header[4];
-  if (inner_len + 20 != len) {
+  if (inner_len + 20 > len) {
     vkprintf (1, "received packet with bad inner length: %d (%d expected)\n", inner_len, len - 20);
     return 0;
   }
-  if (len < 40) {
+  if (inner_len < 20) {
     //must have at least function id and nonce
     return 0;
   }
