@@ -411,7 +411,7 @@ int epoll_work (int timeout) {
 
   double epoll_wait_start = get_utime_monotonic ();
 
-  epoll_fetch_events (1);
+  epoll_fetch_events (timeout);
 
   last_epoll_wait_at = get_utime_monotonic ();
   double epoll_wait_time = last_epoll_wait_at - epoll_wait_start;
