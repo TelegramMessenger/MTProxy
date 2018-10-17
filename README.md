@@ -74,7 +74,7 @@ this mode on client side.
 ```bash
 nano /etc/systemd/system/MTProxy.service
 ```
-2. Edit this basic service (especially paths and params):
+2. Edit this basic service (especially paths and params, M params is a count of parallel workers, choose more if you have powerful machine):
 ```bash
 [Unit]
 Description=MTProxy
@@ -83,7 +83,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/MTProxy
-ExecStart=/opt/MTProxy/mtproto-proxy -u nobody -p 8888 -H 443 -S <secret> -P <proxy tag> <other params>
+ExecStart=/opt/MTProxy/mtproto-proxy -u nobody -p 8888 -H 443 -S <secret> -P <proxy tag> <other params> -M 1
 Restart=on-failure
 
 [Install]
