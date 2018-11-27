@@ -3,7 +3,7 @@ FROM debian
 WORKDIR /app
 
 RUN apt update && apt -y install git curl build-essential libssl-dev zlib1g-dev
-RUN git clone https://github.com/kooroshh/MTProxy
+RUN git clone https://github.com/TelegramMessenger/MTProxy
 RUN cd MTProxy && make && cp objs/bin/mtproto-proxy /app
 RUN curl -s https://core.telegram.org/getProxySecret -o proxy-secret
 RUN curl -s https://core.telegram.org/getProxyConfig -o proxy-multi.conf
