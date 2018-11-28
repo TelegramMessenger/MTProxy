@@ -70,11 +70,16 @@ Add `dd` prefix to secret (`cafe...babe` => `ddcafe...babe`) to enable
 this mode on client side.
 
 ## Systemd example configuration
-1. Create systemd service file (it's standart path for the most Linux distros, but you should check it before):
+1. Copy binary and configuration files into /opt/MTProxy before creating a systemd file.
+```bash
+mkdir /opt/MTProxy
+cp * /opt/MTProxy
+```
+2. Create systemd service file (it's standard path for the most Linux distros, but you should check it before):
 ```bash
 nano /etc/systemd/system/MTProxy.service
 ```
-2. Edit this basic service (especially paths and params):
+3. Edit this basic service (especially paths and params):
 ```bash
 [Unit]
 Description=MTProxy
@@ -89,17 +94,17 @@ Restart=on-failure
 [Install]
 WantedBy=multi-user.target
 ```
-3. Reload daemons:
+4. Reload daemons:
 ```bash
 systemctl daemon-reload
 ```
-4. Test fresh MTProxy service:
+5. Test fresh MTProxy service:
 ```bash
 systemctl restart MTProxy.service
 # Check status, it should be active
 systemctl status MTProxy.service
 ```
-5. Enable it, to autostart service after reboot:
+6. Enable it, to autostart service after reboot:
 ```bash
 systemctl enable MTProxy.service
 ```
