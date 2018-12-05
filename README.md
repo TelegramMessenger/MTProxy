@@ -70,7 +70,7 @@ Add `dd` prefix to secret (`cafe...babe` => `ddcafe...babe`) to enable
 this mode on client side.
 
 ## Systemd example configuration
-1. Create systemd service file (it's standart path for the most Linux distros, but you should check it before):
+1. Create systemd service file (it's standard path for the most Linux distros, but you should check it before):
 ```bash
 nano /etc/systemd/system/MTProxy.service
 ```
