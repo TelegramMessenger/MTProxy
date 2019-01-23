@@ -30,3 +30,4 @@ extern conn_type_t ct_tcp_rpc_ext_server;
 
 int tcp_rpcs_compact_parse_execute (connection_job_t c);
 void tcp_rpcs_set_ext_secret(unsigned char secret[16]);
+void tcp_rpcs_set_ext_rand_pad_only(int set);

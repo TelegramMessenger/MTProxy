@@ -81,10 +81,15 @@ int tcp_rpcs_default_execute (connection_job_t c, int op, struct raw_message *ms
 
 static unsigned char ext_secret[16][16];
 static int ext_secret_cnt = 0;
+static int ext_rand_pad_only = 0;
 
 void tcp_rpcs_set_ext_secret(unsigned char secret[16]) {
   assert (ext_secret_cnt < 16);
   memcpy (ext_secret[ext_secret_cnt ++], secret, 16);
+}
+
+void tcp_rpcs_set_ext_rand_pad_only(int set) {
+  ext_rand_pad_only = set;
 }
 
 /*
@@ -223,7 +228,7 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
         T->read_aeskey.type->ctr128_crypt (&T->read_aeskey, random_header, random_header, 64, T->read_iv, T->read_ebuf, &T->read_num);
         unsigned tag = *(unsigned *)(random_header + 56);
 
-        if (tag == 0xdddddddd || tag == 0xeeeeeeee || tag == 0xefefefef) {
+        if (tag == 0xdddddddd || ((tag == 0xeeeeeeee || tag == 0xefefefef) && !ext_rand_pad_only)) {
           assert (rwm_skip_data (&c->in, 64) == 64);
           rwm_union (&c->in_u, &c->in);
           rwm_init (&c->in, 0);
