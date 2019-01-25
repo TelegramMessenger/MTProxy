@@ -62,6 +62,7 @@
 #include "mtproto-config.h"
 #include "common/tl-parse.h"
 #include "engine/engine.h"
+#include "engine/engine-net.h"
 
 #ifndef COMMIT
 #define COMMIT "unknown"
@@ -2123,6 +2124,7 @@ void usage (void) {
   exit (2);
 }
 
+server_functions_t mtproto_front_functions;
 int f_parse_option (int val) {
   char *colon, *ptr;
   switch (val) {
@@ -2174,6 +2176,10 @@ int f_parse_option (int val) {
       ping_interval = PING_INTERVAL;
     }
     break;
+  case 2000:
+    engine_set_http_fallback (&ct_http_server, &http_methods_stats);
+    mtproto_front_functions.flags &= ~ENGINE_NO_PORT;
+    break;
   case 'S':
   case 'P':
     {
@@ -2216,6 +2222,7 @@ int f_parse_option (int val) {
 }
 
 void mtfront_prepare_parse_options (void) {
+  parse_option ("http-stats", no_argument, 0, 2000, "allow http server to answer on stats queries");
   parse_option ("mtproto-secret", required_argument, 0, 'S', "16-byte secret in hex mode");
   parse_option ("proxy-tag", required_argument, 0, 'P', "16-byte proxy tag in hex mode to be passed along with all forwarded queries");
   parse_option ("max-special-connections", required_argument, 0, 'C', "sets maximal number of accepted client connections per worker");
@@ -2328,7 +2335,8 @@ server_functions_t mtproto_front_functions = {
   .FullVersionStr = FullVersionStr,
   .ShortVersionStr = "mtproxy",
   .parse_function = mtfront_parse_function,
-  .http_functions = &http_methods_stats
+  .flags = ENGINE_NO_PORT
+  //.http_functions = &http_methods_stats
 };
 
 int main (int argc, char *argv[]) {
