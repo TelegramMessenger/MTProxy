@@ -55,11 +55,10 @@ int get_port_mod (void) /* {{{ */ {
 
 int try_open_port (int port, int quit_on_fail) /* {{{ */ {
   engine_t *E = engine_state;
-  int enable_ipv6 = engine_check_ipv6_enabled () ? SM_IPV6 : 0;
   if (engine_check_tcp_enabled ()) {
     struct in_addr l;
     l.s_addr = htonl(0x7f000001);
-    E->sfd = server_socket (port, l, engine_get_backlog (), enable_ipv6);
+    E->sfd = server_socket (port, l, engine_get_backlog (), 0);
     vkprintf (1, "opened tcp socket\n");
     if (E->sfd < 0) {
       if (quit_on_fail) {
