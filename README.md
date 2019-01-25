@@ -69,6 +69,8 @@ It's only enabled for clients which request it.
 Add `dd` prefix to secret (`cafe...babe` => `ddcafe...babe`) to enable
 this mode on client side.
 
+Adding argument "-R" to the command line will cause MTProxy to allow connections only from the clients with random padding mode enabled.
+
 ## Systemd example configuration
 1. Create systemd service file (it's standard path for the most Linux distros, but you should check it before):
 ```bash

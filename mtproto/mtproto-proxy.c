@@ -2215,6 +2215,9 @@ int f_parse_option (int val) {
       }
     }
     break;
+  case 'R':
+    tcp_rpcs_set_ext_rand_pad_only(1);
+    break;
   default:
     return -1;
   }
@@ -2231,6 +2234,7 @@ void mtfront_prepare_parse_options (void) {
   // parse_option ("outbound-connections-ps", required_argument, 0, 'o', "limits creation rate of outbound connections to mtproto-servers (default %d)", DEFAULT_OUTBOUND_CONNECTION_CREATION_RATE);
   parse_option ("slaves", required_argument, 0, 'M', "spawn several slave workers");
   parse_option ("ping-interval", required_argument, 0, 'T', "sets ping interval in second for local TCP connections (default %.3lf)", PING_INTERVAL);
+  parse_option ("random-padding-only", no_argument, 0, 'R', "allow only clients with random padding option enabled");
 }
 
 void mtfront_parse_extra_args (int argc, char *argv[]) /* {{{ */ {
