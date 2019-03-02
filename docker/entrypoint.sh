@@ -120,4 +120,4 @@ echo "[*]   Make sure to fix the links in case you run the proxy on a different 
 echo
 echo '[+] Starting proxy...'
 sleep 1
-exec /usr/local/bin/mtproto-proxy -p 7227 -H 443 -M "$WORKERS" -C 60000 --aes-pwd ${PROXY_SECRET} -u root $PROXY_CONFIG --allow-skip-dh --nat-info "$INTERNAL_IP:$EXTERNAL_IP" $SECRET_CMD $TAG_CMD
+exec /srv/mtproto-proxy/mtproto-proxy -p 7227 -H 443 -M "$WORKERS" -C 60000 --aes-pwd ${PROXY_SECRET} -u root $PROXY_CONFIG --allow-skip-dh --nat-info "$INTERNAL_IP:$EXTERNAL_IP" $SECRET_CMD $TAG_CMD
