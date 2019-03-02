@@ -71,10 +71,31 @@ curl -s https://core.telegram.org/getProxySecret -o ${PROXY_SECRET} || {
   exit 2
 }
 
-IP="$(curl -s -4 "https://digitalresistance.dog/myIp")"
-INTERNAL_IP="$(ip -4 route get 8.8.8.8 | grep '^8\.8\.8\.8\s' | grep -Po 'src\s+\d+\.\d+\.\d+\.\d+' | awk '{print $2}')"
+if [ ! -z "$EXTERNAL_IP" ]; then
+  echo "[+] Using the explicitly passed external IP: ${EXTERNAL_IP}."
+else
+  EXTERNAL_IP="$(curl -s -4 "https://digitalresistance.dog/myIp")"
+  if [[ -z "$EXTERNAL_IP" ]]; then
+    echo "[F] Cannot determine external IP address."
+    exit 3
+  else
+    echo "[+] Using the detected external IP: ${EXTERNAL_IP}."
+  fi
+fi
 
-if [[ -z "$IP" ]]; then
+if [ ! -z "$INTERNAL_IP" ]; then
+  echo "[+] Using the explicitly passed internal IP: ${INTERNAL_IP}."
+else
+  INTERNAL_IP="$(ip -4 route get 8.8.8.8 | grep '^8\.8\.8\.8\s' | grep -Eo 'src\s+\d+\.\d+\.\d+\.\d+' | awk '{print $2}')"
+  if [[ -z "$INTERNAL_IP" ]]; then
+    echo "[F] Cannot determine internal IP address."
+    exit 4
+  else
+    echo "[+] Using the detected internal IP: ${INTERNAL_IP}."
+  fi
+fi
+
+if [[ -z "$EXTERNAL_IP" ]]; then
   echo "[F] Cannot determine external IP address."
   exit 3
 fi
@@ -88,15 +109,15 @@ echo "[*] Final configuration:"
 I=1
 echo "$SECRET" | tr ',' '\n' | while read S; do
   echo "[*]   Secret $I: $S"
-  echo "[*]   tg:// link for secret $I auto configuration: tg://proxy?server=${IP}&port=443&secret=${S}"
-  echo "[*]   t.me link for secret $I: https://t.me/proxy?server=${IP}&port=443&secret=${S}"
+  echo "[*]   tg:// link for secret $I auto configuration: tg://proxy?server=${EXTERNAL_IP}&port=443&secret=${S}"
+  echo "[*]   t.me link for secret $I: https://t.me/proxy?server=${EXTERNAL_IP}&port=443&secret=${S}"
   I=$(($I+1))
 done
 
 [ ! -z "$TAG" ] && echo "[*]   Tag: $TAG" || echo "[*]   Tag: no tag"
-echo "[*]   External IP: $IP"
+echo "[*]   External IP: $EXTERNAL_IP"
 echo "[*]   Make sure to fix the links in case you run the proxy on a different port."
 echo
 echo '[+] Starting proxy...'
 sleep 1
-exec /usr/local/bin/mtproto-proxy -p 7227 -H 443 -M "$WORKERS" -C 60000 --aes-pwd ${PROXY_SECRET} -u root $PROXY_CONFIG --allow-skip-dh --nat-info "$INTERNAL_IP:$IP" $SECRET_CMD $TAG_CMD
+exec /usr/local/bin/mtproto-proxy -p 7227 -H 443 -M "$WORKERS" -C 60000 --aes-pwd ${PROXY_SECRET} -u root $PROXY_CONFIG --allow-skip-dh --nat-info "$INTERNAL_IP:$EXTERNAL_IP" $SECRET_CMD $TAG_CMD
