@@ -23,5 +23,5 @@ COPY docker/entrypoint.sh .
 VOLUME /srv/mtproto-proxy/config
 EXPOSE 7227 443
 
-ENTRYPOINT ["/srv/mtproto-proxy/entrypoint.sh"]
+ENTRYPOINT ["sh", "/srv/mtproto-proxy/entrypoint.sh"]
 CMD [ "--port", "7227", "--http-ports", "443", "--slaves", "2", "--max-special-connections", "60000",  "--allow-skip-dh"]
