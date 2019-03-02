@@ -34,7 +34,7 @@ else
   done
 fi
 
-if echo "$SECRET" | grep -qE '^[0-9a-fA-F]{32}(,[0-9a-fA-F]{32}){,15}$'; then
+if echo "$SECRET" | grep -qE '^[0-9a-fA-F]{32}(,[0-9a-fA-F]{32}){0,15}$'; then
   SECRET="$(echo "$SECRET" | tr '[:upper:]' '[:lower:]')"
   SECRET_CMD="-S $(echo "$SECRET" | sed 's/,/ -S /g')"
   echo -- "$SECRET_CMD" > /srv/mtproto-proxy/config/secret_cmd
