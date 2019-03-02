@@ -19,7 +19,7 @@ elif [ -f /srv/mtproto-proxy/config/secret ]; then
   echo "[+] Using the secret in /srv/mtproto-proxy/config/secret: '$SECRET'."
 else
   if [[ ! -z "$SECRET_COUNT" ]]; then
-    if [[ ! ( "$SECRET_COUNT" -ge 1 &&  "$SECRET_COUNT" -le 16 ) ]]; then
+    if [[ "$SECRET_COUNT" -le 1 || "$SECRET_COUNT" -ge 16 ]]; then
       echo "[F] Can generate between 1 and 16 secrets."
       exit 5
     fi
