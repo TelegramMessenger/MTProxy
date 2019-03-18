@@ -16,7 +16,7 @@
 
     Copyright 2012-2013 Vkontakte Ltd
               2012-2013 Anton Maydell
-    
+
     Copyright 2014-2016 Telegram Messenger Inc
               2014-2016 Anton Maydell
 */
@@ -24,6 +24,7 @@
 #pragma once
 
 #include <openssl/aes.h>
+#include <openssl/evp.h>
 
 struct aesni256_ctx {
   unsigned char a[256];
@@ -34,8 +35,6 @@ struct tg_aes_ctx;
 
 struct tg_aes_methods {
   void (*cbc_crypt) (struct tg_aes_ctx *ctx, const unsigned char *in, unsigned char *out, int size, unsigned char iv[16]);
-  void (*ige_crypt) (struct tg_aes_ctx *ctx, const unsigned char *in, unsigned char *out, int size, unsigned char iv[32]);
-  void (*ctr_crypt) (struct tg_aes_ctx *ctx, const unsigned char *in, unsigned char *out, int size, unsigned char iv[16], unsigned long long offset);
   void (*ctr128_crypt) (struct tg_aes_ctx *ctx, const unsigned char *in, unsigned char *out, int size, unsigned char iv[16], unsigned char ecount_buf[16], unsigned int *num);
 };
 
@@ -45,8 +44,13 @@ typedef struct tg_aes_ctx {
     struct aesni256_ctx ctx;
   } u;
   const struct tg_aes_methods *type;
+  EVP_CIPHER_CTX *evp_enc_ctx;
+  EVP_CIPHER_CTX *evp_dec_ctx;
 } tg_aes_ctx_t;
 
-void tg_aes_set_encrypt_key (tg_aes_ctx_t *ctx, unsigned char *key, int bits);
-void tg_aes_set_decrypt_key (tg_aes_ctx_t *ctx, unsigned char *key, int bits);
+void tg_aes_set_encrypt_key_cbc (tg_aes_ctx_t *ctx, unsigned char *key, unsigned char iv[16], int bits);
+void tg_aes_set_decrypt_key_cbc (tg_aes_ctx_t *ctx, unsigned char *key, unsigned char iv[16], int bits);
+void tg_aes_set_encrypt_key_ctr (tg_aes_ctx_t *ctx, unsigned char *key, unsigned char iv[16], int bits);
+void tg_aes_set_decrypt_key_ctr (tg_aes_ctx_t *ctx, unsigned char *key, unsigned char iv[16], int bits);
+
 void tg_aes_ctx_cleanup (tg_aes_ctx_t *ctx);
