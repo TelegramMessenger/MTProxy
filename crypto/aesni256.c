@@ -40,7 +40,14 @@ void AES_ctr128_encrypt(
 		unsigned char ivec[AES_BLOCK_SIZE],
 		unsigned char ecount_buf[AES_BLOCK_SIZE],
 		unsigned int *num) {
-	CRYPTO_ctr128_encrypt(in, out, length, key, ivec, ecount_buf, num, (block128_f)AES_encrypt);
+    block128_f block_func = (block128_f)
+#ifdef USE_AESNI
+        aesni_encrypt;
+#else
+        AES_encrypt;
+#endif
+
+	CRYPTO_ctr128_encrypt(in, out, length, key, ivec, ecount_buf, num, block_func);
 }
 #endif
 
