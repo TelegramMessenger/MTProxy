@@ -32,6 +32,11 @@
 
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
 #include <openssl/modes.h>
+
+#ifdef USE_AESNI
+void aesni_encrypt(const unsigned char *in, unsigned char *out, const AES_KEY *key);
+#endif
+
 void AES_ctr128_encrypt(
 		const unsigned char *in, 
 		unsigned char *out,
