@@ -106,7 +106,11 @@ void tg_aes_set_encrypt_key_cbc (tg_aes_ctx_t *ctx, unsigned char *key, unsigned
 }
 
 void tg_aes_set_encrypt_key_ctr (tg_aes_ctx_t *ctx, unsigned char *key, unsigned char iv[16], int bits) {
+#ifdef USE_AESNI
+  aesni_set_encrypt_key(key, bits, &ctx->u.key);
+#else
   AES_set_encrypt_key (key, bits, &ctx->u.key);
+#endif
 
   ctx->type = &ssl_aes_encrypt_methods;
 }
@@ -128,7 +132,11 @@ void tg_aes_set_decrypt_key_cbc (tg_aes_ctx_t *ctx, unsigned char *key, unsigned
 }
 
 void tg_aes_set_decrypt_key_ctr (tg_aes_ctx_t *ctx, unsigned char *key, unsigned char iv[16], int bits) {
+#ifdef USE_AESNI
+  aesni_set_decrypt_key(key, bits, &ctx->u.key);
+#else
   AES_set_decrypt_key (key, bits, &ctx->u.key);
+#endif
 
   ctx->type = &ssl_aes_decrypt_methods;
 }
