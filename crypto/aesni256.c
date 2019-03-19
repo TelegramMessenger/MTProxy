@@ -22,6 +22,7 @@
 */
 
 #include "crypto/aesni256.h"
+
 #include <assert.h>
 #include <string.h>
 #include <stdint.h>
@@ -43,94 +44,91 @@ void AES_ctr128_encrypt(
 }
 #endif
 
-void tg_ssl_aes_ctr_crypt (tg_aes_ctx_t *ctx, const unsigned char *in, unsigned char *out, int size, unsigned char iv[16], unsigned long long offset) {
-  unsigned char iv_copy[16];
-  memcpy (iv_copy, iv, 16);
-  unsigned long long *p = (unsigned long long *) (iv_copy + 8);
-  (*p) += offset >> 4;
-  union {
-    unsigned char c[16];
-    unsigned long long d[2];
-  } u;
-  int i = offset & 15, l;
-  if (i) {
-    AES_encrypt (iv_copy, u.c, &ctx->u.key);
-    (*p)++;
-    l = i + size;
-    if (l > 16) {
-      l = 16;
-    }
-    size -= l - i;
-    do {
-      *out++ = (*in++) ^ u.c[i++];
-    } while (i < l);
-  }
-  const unsigned long long *I = (const unsigned long long *) in;
-  unsigned long long *O = (unsigned long long *) out;
-  int n = size >> 4;
-  while (--n >= 0) {
-    AES_encrypt (iv_copy, (unsigned char *) u.d, &ctx->u.key);
-    (*p)++;
-    *O++ = (*I++) ^ u.d[0];
-    *O++ = (*I++) ^ u.d[1];
-  }
-  l = size & 15;
-  if (l) {
-    AES_encrypt (iv_copy, u.c, &ctx->u.key);
-    in = (const unsigned char *) I;
-    out = (unsigned char *) O;
-    i = 0;
-    do {
-      *out++ = (*in++) ^ u.c[i++];
-    } while (i < l);
-  }
+static void handle_errors() {
+  assert(0);
 }
 
-
 static void tg_ssl_aes_cbc_encrypt (tg_aes_ctx_t *ctx, const unsigned char *in, unsigned char *out, int size, unsigned char iv[16]) {
-  AES_cbc_encrypt (in, out, size, &ctx->u.key, iv, AES_ENCRYPT);
+  int len;
+
+  if(EVP_EncryptUpdate(ctx->evp_enc_ctx, out, &len, in, size) != 1) {
+    handle_errors();
+  }
+
+  if(EVP_EncryptFinal_ex(ctx->evp_enc_ctx, out + len, &len) != 1) {
+    handle_errors();
+  }
 }
 
 static void tg_ssl_aes_cbc_decrypt (tg_aes_ctx_t *ctx, const unsigned char *in, unsigned char *out, int size, unsigned char iv[16]) {
-  AES_cbc_encrypt (in, out, size, &ctx->u.key, iv, AES_DECRYPT);
+  int len;
+
+  if(EVP_DecryptUpdate(ctx->evp_dec_ctx, out, &len, in, size) != 1) {
+    handle_errors();
+  }
+
+  if(EVP_DecryptFinal_ex(ctx->evp_dec_ctx, out + len, &len) != 1) {
+    handle_errors();
+  }
 }
 
-static void tg_ssl_aes_ige_encrypt (tg_aes_ctx_t *ctx, const unsigned char *in, unsigned char *out, int size, unsigned char iv[32]) {
-  AES_ige_encrypt (in, out, size, &ctx->u.key, iv, AES_ENCRYPT);
-}
-
-static void tg_ssl_aes_ige_decrypt (tg_aes_ctx_t *ctx, const unsigned char *in, unsigned char *out, int size, unsigned char iv[32]) {
-  AES_ige_encrypt (in, out, size, &ctx->u.key, iv, AES_DECRYPT);
-}
-
-void tg_ssl_aes_ctr128_crypt (struct tg_aes_ctx *ctx, const unsigned char *in, unsigned char *out, int size, unsigned char iv[16], unsigned char ecount_buf[16], unsigned int *num) {
-  AES_ctr128_encrypt (in, out, size, &ctx->u.key, iv, ecount_buf, num);
+void tg_ssl_aes_ctr128_crypt (struct tg_aes_ctx *ctx, const unsigned char *in, unsigned char *out, int size, unsigned char iv[16], 
+                                unsigned char ecount_buf[16], unsigned int *num) {
+    AES_ctr128_encrypt (in, out, size, &ctx->u.key, iv, ecount_buf, num);
 }
 
 static const struct tg_aes_methods ssl_aes_encrypt_methods = {
   .cbc_crypt = tg_ssl_aes_cbc_encrypt,
-  .ige_crypt = tg_ssl_aes_ige_encrypt,
-  .ctr_crypt = tg_ssl_aes_ctr_crypt,
   .ctr128_crypt = tg_ssl_aes_ctr128_crypt
 };
 
-void tg_aes_set_encrypt_key (tg_aes_ctx_t *ctx, unsigned char *key, int bits) {
+void tg_aes_set_encrypt_key_cbc (tg_aes_ctx_t *ctx, unsigned char *key, unsigned char iv[16], int bits) {
+  ctx->evp_enc_ctx = EVP_CIPHER_CTX_new();
+  assert(ctx->evp_enc_ctx);
+
+  if(EVP_EncryptInit(ctx->evp_enc_ctx, EVP_aes_256_cbc(), key, iv) != 1) {
+    handle_errors();
+  }
+
+  ctx->type = &ssl_aes_encrypt_methods;
+}
+
+void tg_aes_set_encrypt_key_ctr (tg_aes_ctx_t *ctx, unsigned char *key, unsigned char iv[16], int bits) {
   AES_set_encrypt_key (key, bits, &ctx->u.key);
+
   ctx->type = &ssl_aes_encrypt_methods;
 }
 
 static const struct tg_aes_methods ssl_aes_decrypt_methods = {
   .cbc_crypt = tg_ssl_aes_cbc_decrypt,
-  .ige_crypt = tg_ssl_aes_ige_decrypt,
-  .ctr_crypt = NULL,
   .ctr128_crypt = NULL
 };
 
-void tg_aes_set_decrypt_key (tg_aes_ctx_t *ctx, unsigned char *key, int bits) {
+void tg_aes_set_decrypt_key_cbc (tg_aes_ctx_t *ctx, unsigned char *key, unsigned char iv[16], int bits) {
+  ctx->evp_dec_ctx = EVP_CIPHER_CTX_new();
+  assert(ctx->evp_dec_ctx);
+
+  if(EVP_DecryptInit(ctx->evp_dec_ctx, EVP_aes_256_cbc(), key, iv) != 1) {
+    handle_errors();
+  }
+
+  ctx->type = &ssl_aes_decrypt_methods;
+}
+
+void tg_aes_set_decrypt_key_ctr (tg_aes_ctx_t *ctx, unsigned char *key, unsigned char iv[16], int bits) {
   AES_set_decrypt_key (key, bits, &ctx->u.key);
+
   ctx->type = &ssl_aes_decrypt_methods;
 }
 
 void tg_aes_ctx_cleanup (tg_aes_ctx_t *ctx) {
+  if (ctx->evp_enc_ctx) {
+    EVP_CIPHER_CTX_free(ctx->evp_enc_ctx);
+  }
+
+  if (ctx->evp_dec_ctx) {
+    EVP_CIPHER_CTX_free(ctx->evp_dec_ctx);
+  }
+
   memset (ctx, 0, sizeof (tg_aes_ctx_t));
 }
