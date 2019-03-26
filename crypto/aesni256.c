@@ -29,39 +29,13 @@
 
 #include <openssl/opensslv.h>
 
-void tg_ssl_evp_encrypt(tg_aes_ctx_t *ctx, const unsigned char *in, unsigned char *out, int size) {
-  int len;
-
-  assert(EVP_EncryptUpdate(ctx->evp_ctx, out, &len, in, size) == 1);
-  assert(EVP_EncryptFinal_ex(ctx->evp_ctx, out + len, &len) == 1);
-}
-
-void tg_ssl_evp_decrypt(tg_aes_ctx_t *ctx, const unsigned char *in, unsigned char *out, int size) {
-  int len;
-
-  assert(EVP_DecryptUpdate(ctx->evp_ctx, out, &len, in, size) == 1);
-  assert(EVP_DecryptFinal_ex(ctx->evp_ctx, out + len, &len) == 1);
-}
-
-static const struct tg_aes_methods ssl_aes_encrypt_methods = {
-  .cbc_crypt = tg_ssl_evp_encrypt,
-  .ctr_crypt = tg_ssl_evp_encrypt
-};
-
 void tg_aes_encrypt_init (tg_aes_ctx_t *ctx, unsigned char *key, unsigned char iv[16], const EVP_CIPHER *cipher) {
   ctx->evp_ctx = EVP_CIPHER_CTX_new();
   assert(ctx->evp_ctx);
 
   assert(EVP_EncryptInit(ctx->evp_ctx, cipher, key, iv) == 1);
   assert(EVP_CIPHER_CTX_set_padding(ctx->evp_ctx, 0));
-
-  ctx->type = &ssl_aes_encrypt_methods;
 }
-
-static const struct tg_aes_methods ssl_aes_decrypt_methods = {
-  .cbc_crypt = tg_ssl_evp_decrypt,
-  .ctr_crypt = NULL
-};
 
 void tg_aes_decrypt_init (tg_aes_ctx_t *ctx, unsigned char *key, unsigned char iv[16], const EVP_CIPHER *cipher) {
   ctx->evp_ctx = EVP_CIPHER_CTX_new();
@@ -69,8 +43,18 @@ void tg_aes_decrypt_init (tg_aes_ctx_t *ctx, unsigned char *key, unsigned char i
 
   assert(EVP_DecryptInit(ctx->evp_ctx, cipher, key, iv) == 1);
   assert(EVP_CIPHER_CTX_set_padding(ctx->evp_ctx, 0));
+}
 
-  ctx->type = &ssl_aes_decrypt_methods;
+void tg_aes_crypt(tg_aes_ctx_t *ctx, const void *in, void *out, int size) {
+  int len;
+
+  if (EVP_CIPHER_CTX_encrypting(ctx->evp_ctx)) {
+    assert(EVP_EncryptUpdate(ctx->evp_ctx, out, &len, in, size) == 1);
+    assert(EVP_EncryptFinal_ex(ctx->evp_ctx, out + len, &len) == 1);
+  } else {
+    assert(EVP_DecryptUpdate(ctx->evp_ctx, out, &len, in, size) == 1);
+    assert(EVP_DecryptFinal_ex(ctx->evp_ctx, out + len, &len) == 1);
+  }
 }
 
 void tg_aes_ctx_cleanup (tg_aes_ctx_t *ctx) {

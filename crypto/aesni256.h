@@ -33,20 +33,15 @@ struct aesni256_ctx {
 //TODO: move cbc_crypt, ige_crypt, ctr_crypt to the virtual method table
 struct tg_aes_ctx;
 
-struct tg_aes_methods {
-  void (*cbc_crypt) (struct tg_aes_ctx *ctx, const unsigned char *in, unsigned char *out, int size);
-  void (*ctr_crypt) (struct tg_aes_ctx *ctx, const unsigned char *in, unsigned char *out, int size);
-};
-
 typedef struct tg_aes_ctx {
   union {
     AES_KEY key;
     struct aesni256_ctx ctx;
   } u;
   EVP_CIPHER_CTX *evp_ctx;
-  const struct tg_aes_methods *type;
 } tg_aes_ctx_t;
 
 void tg_aes_encrypt_init (tg_aes_ctx_t *ctx, unsigned char *key, unsigned char iv[16], const EVP_CIPHER *cipher);
 void tg_aes_decrypt_init (tg_aes_ctx_t *ctx, unsigned char *key, unsigned char iv[16], const EVP_CIPHER *cipher);
+void tg_aes_crypt (tg_aes_ctx_t *ctx, const void *in, void *out, int size); //bidirectional
 void tg_aes_ctx_cleanup (tg_aes_ctx_t *ctx);
