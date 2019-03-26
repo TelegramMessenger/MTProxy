@@ -30,7 +30,6 @@ struct aesni256_ctx {
   unsigned char a[256];
 };
 
-//TODO: move cbc_crypt, ige_crypt, ctr_crypt to the virtual method table
 struct tg_aes_ctx;
 
 typedef struct tg_aes_ctx {

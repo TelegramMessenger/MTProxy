@@ -34,7 +34,7 @@ void tg_aes_encrypt_init (tg_aes_ctx_t *ctx, unsigned char *key, unsigned char i
   assert(ctx->evp_ctx);
 
   assert(EVP_EncryptInit(ctx->evp_ctx, cipher, key, iv) == 1);
-  assert(EVP_CIPHER_CTX_set_padding(ctx->evp_ctx, 0));
+  assert(EVP_CIPHER_CTX_set_padding(ctx->evp_ctx, 0) == 1);
 }
 
 void tg_aes_decrypt_init (tg_aes_ctx_t *ctx, unsigned char *key, unsigned char iv[16], const EVP_CIPHER *cipher) {
@@ -42,7 +42,7 @@ void tg_aes_decrypt_init (tg_aes_ctx_t *ctx, unsigned char *key, unsigned char i
   assert(ctx->evp_ctx);
 
   assert(EVP_DecryptInit(ctx->evp_ctx, cipher, key, iv) == 1);
-  assert(EVP_CIPHER_CTX_set_padding(ctx->evp_ctx, 0));
+  assert(EVP_CIPHER_CTX_set_padding(ctx->evp_ctx, 0) == 1);
 }
 
 void tg_aes_crypt(tg_aes_ctx_t *ctx, const void *in, void *out, int size) {
@@ -58,6 +58,8 @@ void tg_aes_crypt(tg_aes_ctx_t *ctx, const void *in, void *out, int size) {
 }
 
 void tg_aes_ctx_cleanup (tg_aes_ctx_t *ctx) {
-  EVP_CIPHER_CTX_free(ctx->evp_ctx);
+  if (ctx->evp_ctx) {
+    EVP_CIPHER_CTX_free(ctx->evp_ctx);
+  }
   memset (ctx, 0, sizeof (tg_aes_ctx_t));
 }
