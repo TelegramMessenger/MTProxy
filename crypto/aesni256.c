@@ -58,8 +58,6 @@ void tg_aes_crypt(tg_aes_ctx_t *ctx, const void *in, void *out, int size) {
 }
 
 void tg_aes_ctx_cleanup (tg_aes_ctx_t *ctx) {
-  if (ctx->evp_ctx) {
-    EVP_CIPHER_CTX_free(ctx->evp_ctx);
-  }
+  EVP_CIPHER_CTX_free(ctx->evp_ctx);
   memset (ctx, 0, sizeof (tg_aes_ctx_t));
 }
