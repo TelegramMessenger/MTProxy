@@ -84,9 +84,6 @@ int aes_crypto_init (connection_job_t c, void *key_data, int key_data_len) {
   struct aes_key_data *D = key_data;
   assert (T);
 
-  memset(&T->read_aeskey, 0, sizeof(T->read_aeskey));
-  memset(&T->write_aeskey, 0, sizeof(T->write_aeskey));
-
   MODULE_STAT->allocated_aes_crypto ++;
   
   tg_aes_decrypt_init (&T->read_aeskey, D->read_key, D->read_iv, EVP_aes_256_cbc());
