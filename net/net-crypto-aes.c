@@ -89,12 +89,10 @@ int aes_crypto_init (connection_job_t c, void *key_data, int key_data_len) {
 
   MODULE_STAT->allocated_aes_crypto ++;
   
-  tg_aes_set_decrypt_key_cbc (&T->read_aeskey, D->read_key, D->read_iv, 256);
+  tg_aes_decrypt_init (&T->read_aeskey, D->read_key, D->read_iv, EVP_aes_256_cbc());
   memcpy (T->read_iv, D->read_iv, 16);
-  tg_aes_set_encrypt_key_cbc (&T->write_aeskey, D->write_key, D->write_iv, 256);
+  tg_aes_encrypt_init (&T->write_aeskey, D->write_key, D->write_iv, EVP_aes_256_cbc());
   memcpy (T->write_iv, D->write_iv, 16);
-  // T->read_pos = T->write_pos = 0;
-  T->read_num = T->write_num = 0;
   CONN_INFO(c)->crypto = T;
   return 0;
 }
@@ -111,18 +109,20 @@ int aes_crypto_ctr128_init (connection_job_t c, void *key_data, int key_data_len
 
   MODULE_STAT->allocated_aes_crypto ++;
   
-  tg_aes_set_encrypt_key_ctr (&T->read_aeskey, D->read_key, D->read_iv, 256); // NB: *_encrypt_key here!
+  tg_aes_encrypt_init (&T->read_aeskey, D->read_key, D->read_iv, EVP_aes_256_ctr()); // NB: *_encrypt_init here!
   memcpy (T->read_iv, D->read_iv, 16);
-  tg_aes_set_encrypt_key_ctr (&T->write_aeskey, D->write_key, D->write_iv, 256);
+  tg_aes_encrypt_init (&T->write_aeskey, D->write_key, D->write_iv, EVP_aes_256_ctr());
   memcpy (T->write_iv, D->write_iv, 16);
-  // T->read_pos = T->write_pos = 0;
-  T->read_num = T->write_num = 0;
   CONN_INFO(c)->crypto = T;
   return 0;
 }
 
 int aes_crypto_free (connection_job_t c) {
-  if (CONN_INFO(c)->crypto) {
+  struct aes_crypto *crypto = CONN_INFO(c)->crypto;
+  if (crypto) {
+    tg_aes_ctx_cleanup(&crypto->read_aeskey);
+    tg_aes_ctx_cleanup(&crypto->write_aeskey);
+
     free (CONN_INFO(c)->crypto);
     CONN_INFO(c)->crypto = 0;
     MODULE_STAT->allocated_aes_crypto --;
