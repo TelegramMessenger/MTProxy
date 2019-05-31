@@ -1,7 +1,34 @@
 # MTProxy
 Simple MT-Proto proxy
 
-## Building
+## Installation
+
+Binary packages is the preferred way of installing MTProxy. Packages are fast to install (respotitory uses CDN), well maintained (build upon latest MTProxy version) and won't introduce build requirements onto your system (no compilers and no dev packages needed to run).
+
+### CentOS / RHEL 7 binary package
+
+Run the following series of commands to install MTProxy, start it as service and enable startup at boot-time:
+
+    sudo yum -y install https://extras.getpagespeed.com/release-el7-latest.rpm 
+    sudo yum -y install mtproxy
+    sudo systemctl enable mtproxy
+    sudo systemctl start mtproxy
+   
+The secret for client configuration is provided via installation prompt and can be found in `/etc/mtproxy/secret`.   
+    
+### CentOS / RHEL 8 binary package  
+
+Run the following series of commands to install MTProxy, start it as service and enable startup at boot-time:
+
+    sudo dnf install https://extras.getpagespeed.com/release-el8-latest.rpm
+    sudo dnf install mtproxy
+    sudo systemctl enable mtproxy
+    sudo systemctl start mtproxy
+
+The secret for client configuration is provided via installation prompt and can be found in `/etc/mtproxy/secret`.
+
+## Building manually
+
 Install dependencies, you would need common set of tools for building from source, and development packages for `openssl` and `zlib`.
 
 On Debian/Ubuntu:
