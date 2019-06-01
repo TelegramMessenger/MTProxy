@@ -5,6 +5,17 @@ Simple MT-Proto proxy
 
 Binary packages is the preferred way of installing MTProxy. Packages are fast to install (respotitory uses CDN), well maintained (build upon latest MTProxy version) and won't introduce build requirements onto your system (no compilers and no dev packages needed to run).
 
+### CentOS / RHEL 6 binary package
+
+Both x86_64 and i686 platforms supported. Run the following series of commands to install MTProxy, start it as service and enable startup at boot-time:
+
+    sudo yum -y install https://extras.getpagespeed.com/release-el6-latest.rpm 
+    sudo yum -y install mtproxy
+    sudo chkconfig mtproxy on
+    sudo service mtproxy start
+
+The secret for client configuration is provided via installation prompt and can be found in `/etc/mtproxy/secret`.   
+    
 ### CentOS / RHEL 7 binary package
 
 Run the following series of commands to install MTProxy, start it as service and enable startup at boot-time:
