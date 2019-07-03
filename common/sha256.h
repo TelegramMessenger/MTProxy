@@ -35,3 +35,5 @@ void sha256_update (sha256_context *ctx, const unsigned char *input, int ilen);
 void sha256_finish (sha256_context *ctx, unsigned char output[32]);
 void sha256 (const unsigned char *input, int ilen, unsigned char output[32]);
 void sha256_two_chunks (const unsigned char *input1, int ilen1, const unsigned char *input2, int ilen2, unsigned char output[32]);
+
+void sha256_hmac (unsigned char *key, int keylen, unsigned char *input, int ilen, unsigned char output[32]);

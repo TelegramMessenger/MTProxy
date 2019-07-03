@@ -33,23 +33,21 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "crc32.h"
-#include "crc32c.h"
+#include <openssl/rand.h>
+
+#include "common/kprintf.h"
+#include "common/precise-time.h"
+#include "common/rpc-const.h"
 #include "common/sha256.h"
-#include "net/net-events.h"
-#include "kprintf.h"
-#include "precise-time.h"
 #include "net/net-connections.h"
-#include "net/net-tcp-rpc-ext-server.h"
+#include "net/net-crypto-aes.h"
+#include "net/net-events.h"
 #include "net/net-tcp-connections.h"
+#include "net/net-tcp-rpc-ext-server.h"
 #include "net/net-thread.h"
 
-#include "rpc-const.h"
-
-#include "net/net-crypto-aes.h"
-//#include "net/net-config.h"
-
 #include "vv/vv-io.h"
+
 /*
  *
  *                EXTERNAL RPC SERVER INTERFACE
@@ -100,6 +98,125 @@ struct tcp_rpc_server_functions default_tcp_rpc_ext_server = {
 };
 */
 
+#define MAX_TLS_SERVER_EXTENSIONS 3
+static int tls_server_extensions[MAX_TLS_SERVER_EXTENSIONS + 1] = {0x33, 0x2b, -1};
+
+int get_tls_server_hello_encrypted_size() {
+  int r = rand();
+  return 2509 + ((r >> 1) & 1) - (r & 1);
+}
+
+struct client_random {
+  unsigned char random[16];
+  struct client_random *next_by_time;
+  struct client_random *next_by_hash;
+  int time;
+};
+
+#define RANDOM_HASH_BITS 14
+static struct client_random *client_randoms[1 << RANDOM_HASH_BITS];
+
+static struct client_random *first_client_random;
+static struct client_random *last_client_random;
+
+static struct client_random **get_bucket(unsigned char random[16]) {
+  int i = RANDOM_HASH_BITS;
+  int pos = 0;
+  int id = 0;
+  while (i > 0) {
+    int bits = i < 8 ? i : 8;
+    id = (id << bits) | (random[pos++] & ((1 << bits) - 1));
+    i -= bits;
+  }
+  assert (0 <= id && id < (1 << RANDOM_HASH_BITS));
+  return client_randoms + id;
+}
+
+static int have_client_random (unsigned char random[16]) {
+  struct client_random *cur = *get_bucket (random);
+  while (cur != NULL) {
+    if (memcmp (random, cur->random, 16) == 0) {
+      return 1;
+    }
+    cur = cur->next_by_hash;
+  }
+  return 0;
+}
+
+static void add_client_random (unsigned char random[16]) {
+  struct client_random *entry = malloc (sizeof (struct client_random));
+  memcpy (entry->random, random, 16);
+  entry->time = now;
+  entry->next_by_time = NULL;
+  if (last_client_random == NULL) {
+    assert (first_client_random == NULL);
+    first_client_random = last_client_random = entry;
+  } else {
+    last_client_random->next_by_time = entry;
+    last_client_random = entry;
+  }
+
+  struct client_random **bucket = get_bucket (random);
+  entry->next_by_hash = *bucket;
+  *bucket = entry;
+}
+
+#define MAX_CLIENT_RANDOM_CACHE_TIME 2 * 86400
+
+static void delete_old_client_randoms() {
+  while (first_client_random != last_client_random) {
+    assert (first_client_random != NULL);
+    if (first_client_random->time > now - MAX_CLIENT_RANDOM_CACHE_TIME) {
+      return;
+    }
+
+    struct client_random *entry = first_client_random;
+    assert (entry->next_by_hash == NULL);
+
+    first_client_random = first_client_random->next_by_time;
+
+    struct client_random **cur = get_bucket (entry->random);
+    while (*cur != entry) {
+      cur = &(*cur)->next_by_hash;
+    }
+    *cur = NULL;
+
+    free (entry);
+  }
+}
+
+static int is_allowed_timestamp (int timestamp) {
+  if (timestamp > now + 3) {
+    // do not allow timestamps in the future
+    // after time synchronization client should always have time in the past
+    vkprintf (1, "Disallow request with timestamp %d from the future\n", timestamp);
+    return 0;
+  }
+
+  // first_client_random->time is an exact time when corresponding request was received
+  // if the timestamp is bigger than (first_client_random->time + 3), then the current request could be accepted
+  // only after the request with first_client_random, so the client random still must be cached
+  // if the request wasn't accepted, then the client_random still will be cached for MAX_CLIENT_RANDOM_CACHE_TIME seconds,
+  // so we can miss duplicate request only after a lot of time has passed
+  if (first_client_random != NULL && timestamp > first_client_random->time + 3) {
+    vkprintf (1, "Allow new request with timestamp %d\n", timestamp);
+    return 1;
+  }
+
+  // allow all requests with timestamp recently in past, regardless of ability to check repeating client random
+  // the allowed error must be big enough to allow requests after time synchronization
+  const int MAX_ALLOWED_TIMESTAMP_ERROR = 10 * 60;
+  if (timestamp > now - MAX_ALLOWED_TIMESTAMP_ERROR) {
+    // this can happen only first (MAX_ALLOWED_TIMESTAMP_ERROR + 3) sceonds after first_client_random->time
+    vkprintf (1, "Allow recent request with timestamp %d without full check for client random duplication\n", timestamp);
+    return 1;
+  }
+
+  // the request is too old to check client random, do not allow it to force client to synchronize it's time
+  vkprintf (1, "Disallow too old request with timestamp %d\n", timestamp);
+  return 0;
+}
+
 int tcp_rpcs_compact_parse_execute (connection_job_t C) {
   struct tcp_rpc_data *D = TCP_RPC_DATA (C);
   if (D->crypto_flags & RPCF_COMPACT_OFF) {
@@ -124,7 +241,6 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
     }
 
     int min_len = (D->flags & RPC_F_MEDIUM) ? 4 : 1;
-
     if (len < min_len + 8) {
       return min_len + 8 - len;
     }
@@ -163,10 +279,145 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
         vkprintf (1, "HTTP type\n");
         return tcp_rpcs_parse_execute (C);
       }
+#endif
 
+      // fake tls
+      if (c->flags & C_IS_TLS) {
+        if (len < 11) {
+          return 11 - len;
+        }
+
+        vkprintf (1, "Established TLS connection\n");
+        unsigned char header[11];
+        assert (rwm_fetch_lookup (&c->in, header, 11) == 11);
+        if (memcmp (header, "\x14\x03\x03\x00\x01\x01\x17\x03\x03", 9) != 0) {
+          vkprintf (1, "error while parsing packet: bad client dummy ChangeCipherSpec\n");
+          fail_connection (C, -1);
+          return 0;
+        }
+
+        min_len = 11 + 256 * header[9] + header[10];
+        if (len < min_len) {
+          vkprintf (2, "Need %d bytes, but have only %d\n", min_len, len);
+          return min_len - len;
+        }
+
+        assert (rwm_skip_data (&c->in, 11) == 11);
+        len -= 11;
+        c->left_tls_packet_length = 256 * header[9] + header[10]; // store left length of current TLS packet in extra_int3
+        vkprintf (2, "Receive first TLS packet of length %d\n", c->left_tls_packet_length);
+
+        if (c->left_tls_packet_length < 64) {
+          vkprintf (1, "error while parsing packet: too short first TLS packet: %d\n", c->left_tls_packet_length);
+          fail_connection (C, -1);
+          return 0;
+        }
+        // now len >= c->left_tls_packet_length >= 64
+
+        assert (rwm_fetch_lookup (&c->in, &packet_len, 4) == 4);
+
+        c->left_tls_packet_length -= 64; // skip header length
+      } else if (packet_len == *(int *)"\x16\x03\x01\x02" && ext_secret_cnt > 0) {
+        unsigned char header[5];
+        assert (rwm_fetch_lookup (&c->in, header, 5) == 5);
+        min_len = 5 + 256 * header[3] + header[4];
+        if (len < min_len) {
+          return min_len - len;
+        }
+        if (len > min_len) {
+          vkprintf (1, "Too much data in ClientHello, receive %d instead of %d\n", len, min_len);
+          return (-1 << 28);
+        }
+
+        vkprintf (1, "TLS type\n");
+
+        unsigned char client_hello[len]; // VLA
+        assert (rwm_fetch_lookup (&c->in, client_hello, len) == len);
+
+        unsigned char client_random[32];
+        memcpy (client_random, client_hello + 11, 32);
+        memset (client_hello + 11, '\0', 32);
+
+        if (have_client_random (client_random)) {
+          vkprintf (1, "Receive again request with the same client random\n");
+          return (-1 << 28);
+        }
+        add_client_random (client_random);
+        delete_old_client_randoms();
+
+        unsigned char expected_random[32];
+        int secret_id;
+        for (secret_id = 0; secret_id < ext_secret_cnt; secret_id++) {
+          sha256_hmac (ext_secret[secret_id], 16, client_hello, len, expected_random);
+          if (memcmp (expected_random, client_random, 28) == 0) {
+            break;
+          }
+        }
+        if (secret_id == ext_secret_cnt) {
+          vkprintf (1, "Receive request with unmatched client random\n");
+          return (-1 << 28);
+        }
+        int timestamp = *(int *)(expected_random + 28) ^ *(int *)(client_random + 28);
+        if (!is_allowed_timestamp (timestamp)) {
+          return (-1 << 28);
+        }
+
+        assert (rwm_skip_data (&c->in, len) == len);
+        c->flags |= C_IS_TLS;
+        c->left_tls_packet_length = -1;
+
+        int encrypted_size = get_tls_server_hello_encrypted_size();
+        int response_size = 127 + 6 + 5 + encrypted_size;
+        unsigned char *buffer = malloc (32 + response_size);
+        assert (buffer != NULL);
+        memcpy (buffer, client_random, 32);
+        unsigned char *response_buffer = buffer + 32;
+        memcpy (response_buffer, "\x16\x03\x03\x00\x7a\x02\x00\x00\x76\x03\x03", 11);
+        memset (response_buffer + 11, '\0', 32);
+        response_buffer[43] = '\x20';
+        memcpy (response_buffer + 44, client_random, 32);
+        memcpy (response_buffer + 76, "\x13\x01\x00\x00\x2e", 5);
+        int i;
+        int pos = 81;
+        for (i = 0; tls_server_extensions[i] != -1; i++) {
+          if (tls_server_extensions[i] == 0x33) {
+            assert (pos + 40 <= response_size);
+            memcpy (response_buffer + pos, "\x00\x33\x00\x24\x00\x1d\x00\x20", 8);
+            RAND_bytes (response_buffer + pos + 8, 32);
+            pos += 40;
+          } else if (tls_server_extensions[i] == 0x2b) {
+            assert (pos + 5 <= response_size);
+            memcpy (response_buffer + pos, "\x00\x2b\x00\x02\x03\x04", 6);
+            pos += 6;
+          } else {
+            assert (0);
+          }
+        }
+        assert (pos == 127);
+        memcpy (response_buffer + 127, "\x14\x03\x03\x00\x01\x01\x17\x03\x03", 9);
+        pos += 9;
+        response_buffer[pos++] = encrypted_size / 256;
+        response_buffer[pos++] = encrypted_size % 256;
+        assert (pos + encrypted_size == response_size);
+        RAND_bytes (response_buffer + pos, encrypted_size);
+
+        unsigned char server_random[32];
+        sha256_hmac (ext_secret[secret_id], 16, buffer, 32 + response_size, server_random);
+        memcpy (response_buffer + 11, server_random, 32);
+
+        struct raw_message *m = calloc (sizeof (struct raw_message), 1);
+        rwm_create (m, response_buffer, response_size);
+        mpq_push_w (c->out_queue, m, 0);
+        job_signal (JOB_REF_CREATE_PASS (C), JS_RUN);
+
+        free (buffer);
+        return 11; // waiting for dummy ChangeCipherSpec and first packet
+      }
+
+#if __ALLOW_UNOBFS__
       int tmp[2];
       assert (rwm_fetch_lookup (&c->in, &tmp, 8) == 8);
-      if (!tmp[1]) {
+      if (!tmp[1] && !(c->flags & C_IS_TLS)) {
         D->crypto_flags |= RPCF_COMPACT_OFF;
         vkprintf (1, "Long type\n");
         return tcp_rpcs_parse_execute (C);
@@ -174,6 +425,7 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
 #endif
 
       if (len < 64) {
+        assert (!(c->flags & C_IS_TLS));
 #if __ALLOW_UNOBFS__
         vkprintf (1, "random 64-byte header: first 0x%08x 0x%08x, need %d more bytes to distinguish\n", tmp[0], tmp[1], 64 - len);
 #else

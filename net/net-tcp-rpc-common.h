@@ -94,18 +94,18 @@ void tcp_rpc_conn_send_data_im (JOB_REF_ARG (C), int len, void *Q);
 int tcp_rpc_default_execute (connection_job_t C, int op, struct raw_message *raw);
 
 /* for crypto_flags in struct tcp_rpc_data */
-#define RPCF_ALLOW_UNENC	1
-#define RPCF_ALLOW_ENC		2
-#define RPCF_REQ_DH		4
-#define RPCF_ALLOW_SKIP_DH	8
+#define RPCF_ALLOW_UNENC	1     // allow unencrypted
+#define RPCF_ALLOW_ENC		2     // allow encrypted
+#define RPCF_REQ_DH		4     // require DH
+#define RPCF_ALLOW_SKIP_DH	8     // crypto NONCE packet sent
 #define RPCF_ENC_SENT		16
-#define RPCF_SEQNO_HOLES	256
-#define RPCF_QUICKACK		512
-#define RPCF_COMPACT_OFF	1024
-#define RPCF_USE_CRC32C		2048
+#define RPCF_SEQNO_HOLES	256   // packet numbers not sequential
+#define RPCF_QUICKACK		512   // allow quick ack packets
+#define RPCF_COMPACT_OFF	1024  // compact mode off
+#define RPCF_USE_CRC32C		2048  // use CRC32-C instead of CRC32
 
 /* for flags in struct tcp_rpc_data */
-#define RPC_F_PAD       0x8000000
+#define RPC_F_PAD		0x8000000
 #define RPC_F_DROPPED		0x10000000
 #define RPC_F_MEDIUM		0x20000000
 #define RPC_F_COMPACT		0x40000000
@@ -124,7 +124,7 @@ struct tcp_rpc_data {
   int flags;
   int in_packet_num;
   int out_packet_num;
-  int crypto_flags;					/* 1 = allow unencrypted, 2 = allow encrypted, 4 = require DH, 8 = crypto NONCE packet sent, 256 = packet numbers not sequential, 512 = allow quick ack packets, 1024 = compact mode off, 2048 = use CRC32-C instead of CRC32 */
+  int crypto_flags;	/* RPCF_* flags */
   struct process_id remote_pid;
   char nonce[16];
   int nonce_time;
