@@ -2076,6 +2076,8 @@ void cron (void) {
 int sfd;
 int http_ports_num;
 int http_sfd[MAX_HTTP_LISTEN_PORTS], http_port[MAX_HTTP_LISTEN_PORTS];
+static int domain_count;
+static int secret_count;
 
 // static double next_create_outbound;
 // int outbound_connections_per_second = DEFAULT_OUTBOUND_CONNECTION_CREATION_RATE;
@@ -2180,6 +2182,10 @@ int f_parse_option (int val) {
     engine_set_http_fallback (&ct_http_server, &http_methods_stats);
     mtproto_front_functions.flags &= ~ENGINE_NO_PORT;
     break;
+  case 'D':
+    tcp_rpc_add_proxy_domain (optarg);
+    domain_count++;
+    break;
   case 'S':
   case 'P':
     {
@@ -2209,6 +2215,7 @@ int f_parse_option (int val) {
       }
       if (val == 'S') {
 	tcp_rpcs_set_ext_secret (secret);
+	secret_count++;
       } else {
 	memcpy (proxy_tag, secret, sizeof (proxy_tag));
 	proxy_tag_set = 1;
@@ -2225,6 +2232,7 @@ void mtfront_prepare_parse_options (void) {
   parse_option ("http-stats", no_argument, 0, 2000, "allow http server to answer on stats queries");
   parse_option ("mtproto-secret", required_argument, 0, 'S', "16-byte secret in hex mode");
   parse_option ("proxy-tag", required_argument, 0, 'P', "16-byte proxy tag in hex mode to be passed along with all forwarded queries");
+  parse_option ("domain", required_argument, 0, 'D', "domain to which all requests unrecognized as TLS-transport requests will be proxied. If specified, value of 'slaves' option is ignored");
   parse_option ("max-special-connections", required_argument, 0, 'C', "sets maximal number of accepted client connections per worker");
   parse_option ("window-clamp", required_argument, 0, 'W', "sets window clamp for client TCP connections");
   parse_option ("http-ports", required_argument, 0, 'H', "comma-separated list of client (HTTP) ports to listen");
@@ -2255,12 +2263,25 @@ void mtfront_pre_init (void) {
 
   vkprintf (1, "config loaded!\n");
 
+  if (domain_count) {
+    tcp_rpc_init_proxy_domains();
+
+    if (workers) {
+      kprintf ("Workers can't be used when a domain for TLS transport is specified");
+      workers = 0;
+    }
+    if (secret_count == 0) {
+      kprintf ("You must specify at least one mtproto-secret to use when using TLS transport");
+      exit (2);
+    }
+  }
+
   int i, enable_ipv6 = engine_check_ipv6_enabled () ? SM_IPV6 : 0;
 
   for (i = 0; i < http_ports_num; i++) {
     http_sfd[i] = server_socket (http_port[i], engine_state->settings_addr, engine_get_backlog (), enable_ipv6);
     if (http_sfd[i] < 0) {
-      fprintf (stderr, "cannot open http/tcp server socket at port %d: %m\n", http_port[i]);
+      kprintf ("cannot open http/tcp server socket at port %d: %m\n", http_port[i]);
       exit (1);
     }
   }
