@@ -86,12 +86,8 @@ int aes_crypto_init (connection_job_t c, void *key_data, int key_data_len) {
 
   MODULE_STAT->allocated_aes_crypto ++;
   
-  tg_aes_set_decrypt_key (&T->read_aeskey, D->read_key, 256);
-  memcpy (T->read_iv, D->read_iv, 16);
-  tg_aes_set_encrypt_key (&T->write_aeskey, D->write_key, 256);
-  memcpy (T->write_iv, D->write_iv, 16);
-  // T->read_pos = T->write_pos = 0;
-  T->read_num = T->write_num = 0;
+  T->read_aeskey = evp_cipher_ctx_init (EVP_aes_256_cbc(), D->read_key, D->read_iv, 0);
+  T->write_aeskey = evp_cipher_ctx_init (EVP_aes_256_cbc(), D->write_key, D->write_iv, 1);
   CONN_INFO(c)->crypto = T;
   return 0;
 }
@@ -105,19 +101,19 @@ int aes_crypto_ctr128_init (connection_job_t c, void *key_data, int key_data_len
 
   MODULE_STAT->allocated_aes_crypto ++;
   
-  tg_aes_set_encrypt_key (&T->read_aeskey, D->read_key, 256); // NB: *_encrypt_key here!
-  memcpy (T->read_iv, D->read_iv, 16);
-  tg_aes_set_encrypt_key (&T->write_aeskey, D->write_key, 256);
-  memcpy (T->write_iv, D->write_iv, 16);
-  // T->read_pos = T->write_pos = 0;
-  T->read_num = T->write_num = 0;
+  T->read_aeskey = evp_cipher_ctx_init (EVP_aes_256_ctr(), D->read_key, D->read_iv, 1); // NB: is_encrypt == 1 here!
+  T->write_aeskey = evp_cipher_ctx_init (EVP_aes_256_ctr(), D->write_key, D->write_iv, 1);
   CONN_INFO(c)->crypto = T;
   return 0;
 }
 
 int aes_crypto_free (connection_job_t c) {
-  if (CONN_INFO(c)->crypto) {
-    free (CONN_INFO(c)->crypto);
+  struct aes_crypto *crypto = CONN_INFO(c)->crypto;
+  if (crypto) {
+    EVP_CIPHER_CTX_free (crypto->read_aeskey);
+    EVP_CIPHER_CTX_free (crypto->write_aeskey);
+
+    free (crypto);
     CONN_INFO(c)->crypto = 0;
     MODULE_STAT->allocated_aes_crypto --;
   }

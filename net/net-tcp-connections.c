@@ -201,7 +201,7 @@ int cpu_tcp_aes_crypto_encrypt_output (connection_job_t C) /* {{{ */ {
   int l = out->total_bytes;
   l &= ~15;
   if (l) {
-    assert (rwm_encrypt_decrypt_to (&c->out, &c->out_p, l, &T->write_aeskey, (void *)T->write_aeskey.type->cbc_crypt, T->write_iv, 16, 0, 0) == l);
+    assert (rwm_encrypt_decrypt_to (&c->out, &c->out_p, l, T->write_aeskey, 16) == l);
   }
 
   return (-out->total_bytes) & 15;
@@ -218,7 +218,7 @@ int cpu_tcp_aes_crypto_decrypt_input (connection_job_t C) /* {{{ */ {
   int l = in->total_bytes;
   l &= ~15;
   if (l) {
-    assert (rwm_encrypt_decrypt_to (&c->in_u, &c->in, l, &T->read_aeskey, (void *)T->read_aeskey.type->cbc_crypt, T->read_iv, 16, 0, 0) == l);
+    assert (rwm_encrypt_decrypt_to (&c->in_u, &c->in, l, T->read_aeskey, 16) == l);
   }
 
   return (-in->total_bytes) & 15;
@@ -253,7 +253,7 @@ int cpu_tcp_aes_crypto_ctr128_encrypt_output (connection_job_t C) /* {{{ */ {
       vkprintf (2, "Send TLS-packet of length %d\n", len);
     }
 
-    assert (rwm_encrypt_decrypt_to (&c->out, &c->out_p, len, &T->write_aeskey, (void *)T->write_aeskey.type->ctr128_crypt, T->write_iv, 1, T->write_ebuf, &T->write_num) == len);
+    assert (rwm_encrypt_decrypt_to (&c->out, &c->out_p, len, T->write_aeskey, 1) == len);
   }
 
   return 0;
@@ -295,7 +295,7 @@ int cpu_tcp_aes_crypto_ctr128_decrypt_input (connection_job_t C) /* {{{ */ {
       c->left_tls_packet_length -= len;
     }
     vkprintf (2, "Read %d bytes out of %d available\n", len, c->in_u.total_bytes);
-    assert (rwm_encrypt_decrypt_to (&c->in_u, &c->in, len, &T->read_aeskey, (void *)T->read_aeskey.type->ctr128_crypt, T->read_iv, 1, T->read_ebuf, &T->read_num) == len);
+    assert (rwm_encrypt_decrypt_to (&c->in_u, &c->in, len, T->read_aeskey, 1) == len);
   }
 
   return 0;
