@@ -755,7 +755,7 @@ static int is_allowed_timestamp (int timestamp) {
   if (timestamp > now + 3) {
     // do not allow timestamps in the future
     // after time synchronization client should always have time in the past
-    vkprintf (1, "Disallow request with timestamp %d from the future\n", timestamp);
+    vkprintf (1, "Disallow request with timestamp %d from the future, now is %d\n", timestamp, now);
     return 0;
   }
 
@@ -792,7 +792,7 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
   struct connection_info *c = CONN_INFO (C);
   int len;
 
-  vkprintf (4, "%s. in_total_bytes = %d\n", __func__, c->in.total_bytes);  
+  vkprintf (4, "%s. in_total_bytes = %d\n", __func__, c->in.total_bytes);
 
   while (1) {
     if (c->flags & C_ERROR) {
@@ -815,7 +815,7 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
     assert (rwm_fetch_lookup (&c->in, &packet_len, 4) == 4);
 
     if (D->in_packet_num == -3) {
-      vkprintf (1, "trying to determine connection type\n");
+      vkprintf (1, "trying to determine type of connection from %s:%d\n", show_remote_ip (C), c->remote_port);
 #if __ALLOW_UNOBFS__
       if ((packet_len & 0xff) == 0xef) {
         D->flags |= RPC_F_COMPACT;
@@ -853,7 +853,7 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
           return 11 - len;
         }
 
-        vkprintf (1, "Established TLS connection\n");
+        vkprintf (1, "Established TLS connection from %s:%d\n", show_remote_ip (C), c->remote_port);
         unsigned char header[11];
         assert (rwm_fetch_lookup (&c->in, header, 11) == 11);
         if (memcmp (header, "\x14\x03\x03\x00\x01\x01\x17\x03\x03", 9) != 0) {
@@ -900,7 +900,7 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
           return (-1 << 28);
         }
 
-        vkprintf (1, "TLS type with domain %s\n", info->domain);
+        vkprintf (1, "TLS type with domain %s from %s:%d\n", info->domain, show_remote_ip (C), c->remote_port);
 
         if (len > min_len) {
           vkprintf (1, "Too much data in ClientHello, receive %d instead of %d\n", len, min_len);
