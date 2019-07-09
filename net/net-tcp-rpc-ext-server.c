@@ -112,6 +112,8 @@ static int allow_only_tls;
 
 struct domain_info {
   const char *domain;
+  struct in_addr target;
+  unsigned char target_ipv6[16];
   short server_hello_encrypted_size;
   char use_random_encrypted_size;
   char is_reversed_extension_order;
@@ -373,6 +375,9 @@ static int update_domain_info (struct domain_info *info) {
 
     int e_connect;
     if (host->h_addrtype == AF_INET) {
+      info->target = *((struct in_addr *) host->h_addr);
+      memset (info->target_ipv6, 0, sizeof (info->target_ipv6));
+
       struct sockaddr_in addr;
       memset (&addr, 0, sizeof (addr));
       addr.sin_family = AF_INET;
@@ -381,6 +386,10 @@ static int update_domain_info (struct domain_info *info) {
 
       e_connect = connect (sockets[i], &addr, sizeof (addr));
     } else {
+      assert (sizeof (struct in6_addr) == sizeof (info->target_ipv6));
+      info->target.s_addr = 0;
+      memcpy (info->target_ipv6, host->h_addr, sizeof (struct in6_addr));
+
       struct sockaddr_in6 addr;
       memset (&addr, 0, sizeof (addr));
       addr.sin6_family = AF_INET6;
@@ -642,7 +651,8 @@ static const struct domain_info *get_sni_domain_info (const unsigned char *reque
 void tcp_rpc_add_proxy_domain (const char *domain) {
   assert (domain != NULL);
 
-  struct domain_info *info = malloc (sizeof (struct domain_info));
+  struct domain_info *info = calloc (1, sizeof (struct domain_info));
+  assert (info != NULL);
   info->domain = strdup (domain);
 
   struct domain_info **bucket = get_domain_info_bucket (domain, strlen (domain));
@@ -662,6 +672,7 @@ void tcp_rpc_init_proxy_domains() {
     while (info != NULL) {
       if (!update_domain_info (info)) {
         kprintf ("Failed to update response data about %s, so default response settings wiil be used\n", info->domain);
+        // keep target addresses as is
         info->is_reversed_extension_order = 0;
         info->use_random_encrypted_size = 1;
         info->server_hello_encrypted_size = 2500 + rand() % 1120;
@@ -783,7 +794,21 @@ static int is_allowed_timestamp (int timestamp) {
   return 0;
 }
 
+static void proxy_connection (connection_job_t C, const struct domain_info *info) {
+  const char zero[16] = {};
+  if (info->target.s_addr == 0 && !memcmp (info->target_ipv6, zero, 16)) {
+    vkprintf (0, "failed to proxy request to %s\n", info->domain);
+    return;
+  }
+
+  // TODO proxy the connection to info->target.s_addr / info->target_ipv6
+}
+
 int tcp_rpcs_compact_parse_execute (connection_job_t C) {
+#define RETURN_TLS_ERROR(info) \
+  proxy_connection (C, info);  \
+  return (-1 << 28);
+
   struct tcp_rpc_data *D = TCP_RPC_DATA (C);
   if (D->crypto_flags & RPCF_COMPACT_OFF) {
     return tcp_rpcs_parse_execute (C);
@@ -897,18 +922,23 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
 
         const struct domain_info *info = get_sni_domain_info (client_hello, read_len);
         if (info == NULL) {
-          return (-1 << 28);
+          RETURN_TLS_ERROR(default_domain_info);
         }
 
         vkprintf (1, "TLS type with domain %s from %s:%d\n", info->domain, show_remote_ip (C), c->remote_port);
 
+        if (c->our_port == 80) {
+          vkprintf (1, "Receive TLS request on port %d, proxying to %s\n", c->our_port, info->domain);
+          RETURN_TLS_ERROR(info);
+        }
+
         if (len > min_len) {
           vkprintf (1, "Too much data in ClientHello, receive %d instead of %d\n", len, min_len);
-          return (-1 << 28);
+          RETURN_TLS_ERROR(info);
         }
         if (len != read_len) {
           vkprintf (1, "Too big ClientHello: receive %d bytes\n", len);
-          return (-1 << 28);
+          RETURN_TLS_ERROR(info);
         }
 
         unsigned char client_random[32];
@@ -917,7 +947,7 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
 
         if (have_client_random (client_random)) {
           vkprintf (1, "Receive again request with the same client random\n");
-          return (-1 << 28);
+          RETURN_TLS_ERROR(info);
         }
         add_client_random (client_random);
         delete_old_client_randoms();
@@ -932,11 +962,11 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
         }
         if (secret_id == ext_secret_cnt) {
           vkprintf (1, "Receive request with unmatched client random\n");
-          return (-1 << 28);
+          RETURN_TLS_ERROR(info);
         }
         int timestamp = *(int *)(expected_random + 28) ^ *(int *)(client_random + 28);
         if (!is_allowed_timestamp (timestamp)) {
-          return (-1 << 28);
+          RETURN_TLS_ERROR(info);
         }
 
         assert (rwm_skip_data (&c->in, len) == len);
@@ -1000,7 +1030,7 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
 
       if (allow_only_tls && !(c->flags & C_IS_TLS)) {
         vkprintf (1, "Expected TLS-transport\n");
-        return (-1 << 28);
+        RETURN_TLS_ERROR(default_domain_info);
       }
 
 #if __ALLOW_UNOBFS__
@@ -1067,7 +1097,7 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
         if (tag == 0xdddddddd || tag == 0xeeeeeeee || tag == 0xefefefef) {
           if (tag != 0xdddddddd && allow_only_tls) {
             vkprintf (1, "Expected random padding mode\n");
-            return (-1 << 28);
+            RETURN_TLS_ERROR(default_domain_info);
           }
           assert (rwm_skip_data (&c->in, 64) == 64);
           rwm_union (&c->in_u, &c->in);
@@ -1204,6 +1234,7 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
     D->in_packet_num++;
   }
   return NEED_MORE_BYTES;
+#undef RETURN_TLS_ERROR
 }
 
 /*
