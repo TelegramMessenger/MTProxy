@@ -195,6 +195,24 @@ struct conn_target_info {
   int global_refcnt;
 };
 
+struct pseudo_conn_target_info {
+  struct event_timer timer;
+  int pad1;
+  int pad2;
+
+  void *pad3;
+  conn_type_t *type;
+  void *extra;
+  struct in_addr target;
+  unsigned char target_ipv6[16];
+  int port;
+  int active_outbound_connections, outbound_connections;
+  int ready_outbound_connections;
+
+  connection_job_t in_conn;
+  connection_job_t out_conn;
+};
+
 struct connection_info {
   struct event_timer timer;
   int fd;
@@ -429,4 +447,4 @@ extern unsigned nat_info[MAX_NAT_INFO_RULES][2];
 int net_add_nat_info (char *str);
 unsigned nat_translate_ip (unsigned local_ip);
 
-connection_job_t alloc_new_connection (int cfd, conn_target_job_t SS, connection_job_t LL, unsigned peer, unsigned char peer_ipv6[16], int peer_port);
+connection_job_t alloc_new_connection (int cfd, conn_target_job_t CTJ, listening_connection_job_t LCJ, int basic_type, conn_type_t *conn_type, void *conn_extra, unsigned peer, unsigned char peer_ipv6[16], int peer_port);

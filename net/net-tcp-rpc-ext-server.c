@@ -85,6 +85,52 @@ conn_type_t ct_tcp_rpc_ext_server = {
   .crypto_needed_output_bytes = cpu_tcp_aes_crypto_ctr128_needed_output_bytes,
 };
 
+int tcp_proxy_pass_parse_execute (connection_job_t C);
+int tcp_proxy_pass_close (connection_job_t C, int who);
+int tcp_proxy_pass_write_packet (connection_job_t c, struct raw_message *raw); 
+
+conn_type_t ct_proxy_pass = {
+  .magic = CONN_FUNC_MAGIC,
+  .flags = C_RAWMSG,
+  .title = "proxypass",
+  .init_accepted = server_failed,
+  .parse_execute = tcp_proxy_pass_parse_execute,
+  .close = tcp_proxy_pass_close,
+  .write_packet = tcp_proxy_pass_write_packet,
+  .connected = server_noop,
+};
+
+int tcp_proxy_pass_parse_execute (connection_job_t C) {
+  struct connection_info *c = CONN_INFO(C);
+  if (!c->extra) {
+    fail_connection (C, -1);
+    return 0;
+  }
+  job_t E = job_incref (c->extra);
+  struct connection_info *e = CONN_INFO(E);
+
+  struct raw_message *r = malloc (sizeof (*r));
+  rwm_move (r, &c->in);
+  mpq_push_w (e->out_queue, PTR_MOVE(r), 0);
+  job_signal (JOB_REF_PASS (E), JS_RUN);
+  return 0;
+}
+
+int tcp_proxy_pass_close (connection_job_t C, int who) {
+  struct connection_info *c = CONN_INFO(C);
+  if (c->extra) {
+    job_t E = PTR_MOVE (c->extra);
+    fail_connection (E, -23);
+    job_decref (JOB_REF_PASS (E));
+  }
+  return cpu_server_close_connection (C, who);
+}
+
+int tcp_proxy_pass_write_packet (connection_job_t C, struct raw_message *raw) {
+  rwm_union (&CONN_INFO(C)->out, raw);
+  return 0;
+}
+
 int tcp_rpcs_default_execute (connection_job_t c, int op, struct raw_message *msg);
 
 static unsigned char ext_secret[16][16];
@@ -794,20 +840,46 @@ static int is_allowed_timestamp (int timestamp) {
   return 0;
 }
 
-static void proxy_connection (connection_job_t C, const struct domain_info *info) {
+static int proxy_connection (connection_job_t C, const struct domain_info *info) {
   const char zero[16] = {};
   if (info->target.s_addr == 0 && !memcmp (info->target_ipv6, zero, 16)) {
     vkprintf (0, "failed to proxy request to %s\n", info->domain);
-    return;
+    fail_connection (C, -17);
+    return 0;
   }
 
-  // TODO proxy the connection to info->target.s_addr / info->target_ipv6
+  int cfd = -1;
+  if (info->target.s_addr) {
+    cfd = client_socket (info->target.s_addr, 443, 0);
+  } else {
+    cfd = client_socket_ipv6 (info->target_ipv6, 443, 0);
+  }
+
+  if (cfd < 0) {
+    fail_connection (C, -27);
+    return 0;
+  }
+
+  struct connection_info *c = CONN_INFO(C);
+  c->type->crypto_free (C);
+  job_incref (C); 
+  job_t EJ = alloc_new_connection (cfd, NULL, NULL, ct_outbound, &ct_proxy_pass, C, ntohl (*(int *)&info->target.s_addr), (void *)info->target_ipv6, 443); 
+
+  if (!EJ) {
+    job_decref_f (C);
+    fail_connection (C, -37);
+    return 0;
+  }
+
+  c->type = &ct_proxy_pass;
+  c->extra = PTR_MOVE(EJ);
+
+  return c->type->parse_execute (C);
 }
 
 int tcp_rpcs_compact_parse_execute (connection_job_t C) {
 #define RETURN_TLS_ERROR(info) \
-  proxy_connection (C, info);  \
-  return (-1 << 28);
+  return proxy_connection (C, info);  
 
   struct tcp_rpc_data *D = TCP_RPC_DATA (C);
   if (D->crypto_flags & RPCF_COMPACT_OFF) {

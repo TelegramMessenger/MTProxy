@@ -493,14 +493,16 @@ int cpu_server_close_connection (connection_job_t C, int who) /* {{{ */ {
   assert (c->io_conn);
   job_signal (JOB_REF_PASS (c->io_conn), JS_ABORT);
 
-  if (c->target) {   
+  if (c->basic_type == ct_outbound) {   
     MODULE_STAT->outbound_connections --;
 
     if (connection_is_active (c->flags)) {
       MODULE_STAT->active_outbound_connections --;
     }
 
-    job_signal (JOB_REF_PASS (c->target), JS_RUN);
+    if (c->target) {
+      job_signal (JOB_REF_PASS (c->target), JS_RUN);
+    }
   } else {
     MODULE_STAT->inbound_connections --;
 
@@ -544,7 +546,9 @@ int do_connection_job (job_t job, int op, struct job_thread *JT) /* {{{ */ {
         __sync_fetch_and_and (&c->flags, ~C_READY_PENDING);
         MODULE_STAT->active_outbound_connections ++;        
         MODULE_STAT->active_connections ++;
-        __sync_fetch_and_add (&CONN_TARGET_INFO(c->target)->active_outbound_connections, 1);
+        if (c->target) {
+          __sync_fetch_and_add (&CONN_TARGET_INFO(c->target)->active_outbound_connections, 1);
+        }
         if (c->status == conn_connecting) {
           if (!__sync_bool_compare_and_swap (&c->status, conn_connecting, conn_working)) {
             assert (c->status == conn_error);
@@ -587,7 +591,7 @@ int do_connection_job (job_t job, int op, struct job_thread *JT) /* {{{ */ {
   updates stats
   creates socket_connection
 */
-connection_job_t alloc_new_connection (int cfd, conn_target_job_t CTJ, listening_connection_job_t LCJ, unsigned peer, unsigned char peer_ipv6[16], int peer_port) /* {{{ */ {
+connection_job_t alloc_new_connection (int cfd, conn_target_job_t CTJ, listening_connection_job_t LCJ, int basic_type, conn_type_t *conn_type, void *conn_extra, unsigned peer, unsigned char peer_ipv6[16], int peer_port) /* {{{ */ {
   if (cfd < 0) {
     return NULL;
   }
@@ -648,12 +652,12 @@ connection_job_t alloc_new_connection (int cfd, conn_target_job_t CTJ, listening
     assert (0);
   }
 
-  c->type = CT ? CT->type : LC->type;
-  c->extra = CT ? CT->extra : LC->extra;
+  c->type = conn_type;
+  c->extra = conn_extra;
   assert (c->type);
   
-  c->basic_type = CT ? ct_outbound : ct_inbound;
-  c->status = CT ? conn_connecting : conn_working;
+  c->basic_type = basic_type;
+  c->status = (basic_type == ct_outbound) ? conn_connecting : conn_working;
   
   c->flags |= c->type->flags & C_EXTERNAL;
   if (LC) {
@@ -692,41 +696,58 @@ connection_job_t alloc_new_connection (int cfd, conn_target_job_t CTJ, listening
   c->out_queue = alloc_mp_queue_w ();
   //c->out_packet_queue = alloc_mp_queue_w ();
   
-  if (CT) {
+  if (basic_type == ct_outbound) {
     vkprintf (1, "New connection %s:%d -> %s:%d\n", show_our_ip (C), c->our_port, show_remote_ip (C), c->remote_port);
   } else {
     vkprintf (1, "New connection %s:%d -> %s:%d\n", show_remote_ip (C), c->remote_port, show_our_ip (C), c->our_port);
   }
 
 
-  int (*func)(connection_job_t) = CT ? CT->type->init_outbound : LC->type->init_accepted;
+  int (*func)(connection_job_t) = (basic_type == ct_outbound) ? c->type->init_outbound : c->type->init_accepted;
 
   vkprintf (3, "func = %p\n", func);
   
 
   if (func (C) >= 0) {
-    if (CT) {
-      job_incref (CTJ);
+    if (basic_type == ct_outbound) {
 
       MODULE_STAT->outbound_connections ++;
       MODULE_STAT->allocated_outbound_connections ++;
       MODULE_STAT->outbound_connections_created ++;
 
-      CT->outbound_connections ++;
+      if (CTJ) {
+        job_incref (CTJ);
+        CT->outbound_connections ++;
+      }
     } else {
       MODULE_STAT->inbound_connections_accepted ++;
       MODULE_STAT->allocated_inbound_connections ++;
       MODULE_STAT->inbound_connections ++;
       MODULE_STAT->active_inbound_connections ++;
       MODULE_STAT->active_connections ++;
+    
+      if (LCJ) {
+        c->listening = LC->fd;
+        c->listening_generation = LC->generation;
+        if (LC->flags & C_NOQACK) {
+          c->flags |= C_NOQACK;
+        }
       
-      c->listening = LC->fd;
-      c->listening_generation = LC->generation;
-      if (LC->flags & C_NOQACK) {
-        c->flags |= C_NOQACK;
+        c->window_clamp = LC->window_clamp;
+        
+        if (LC->flags & C_SPECIAL) {
+          c->flags |= C_SPECIAL;
+          __sync_fetch_and_add (&active_special_connections, 1);
+
+          if (active_special_connections > max_special_connections) {
+            vkprintf (active_special_connections >= max_special_connections + 16 ? 0 : 1, "ERROR: forced to accept connection when special connections limit was reached (%d of %d)\n", active_special_connections, max_special_connections);
+          }
+          if (active_special_connections >= max_special_connections) {
+            vkprintf (2, "**Invoking epoll_remove(%d)\n", LC->fd);
+            epoll_remove (LC->fd);
+          }
+        }
       }
-      
-      c->window_clamp = LC->window_clamp;
       if (c->window_clamp) {
         if (setsockopt (cfd, IPPROTO_TCP, TCP_WINDOW_CLAMP, &c->window_clamp, 4) < 0) {
           vkprintf (0, "error while setting window size for socket %d to %d: %m\n", cfd, c->window_clamp);
@@ -739,18 +760,6 @@ connection_job_t alloc_new_connection (int cfd, conn_target_job_t CTJ, listening
         }
       }
       
-      if (LC->flags & C_SPECIAL) {
-        c->flags |= C_SPECIAL;
-        __sync_fetch_and_add (&active_special_connections, 1);
-        
-        if (active_special_connections > max_special_connections) {
-          vkprintf (active_special_connections >= max_special_connections + 16 ? 0 : 1, "ERROR: forced to accept connection when special connections limit was reached (%d of %d)\n", active_special_connections, max_special_connections);
-        }
-        if (active_special_connections >= max_special_connections) {
-          vkprintf (2, "**Invoking epoll_remove(%d)\n", LC->fd);
-          epoll_remove (LC->fd);
-        }
-      }
     }
 
     alloc_new_socket_connection (C);
@@ -1279,10 +1288,10 @@ int net_accept_new_connections (listening_connection_job_t LCJ) /* {{{ */ {
    
     connection_job_t C;
     if (peer.a4.sin_family == AF_INET) {
-      C = alloc_new_connection (cfd, NULL, LCJ,
+      C = alloc_new_connection (cfd, NULL, LCJ, ct_inbound, LC->type, LC->extra,
         ntohl (peer.a4.sin_addr.s_addr), NULL, ntohs (peer.a4.sin_port));
     } else {
-      C = alloc_new_connection (cfd, NULL, LCJ,
+      C = alloc_new_connection (cfd, NULL, LCJ, ct_inbound, LC->type, LC->extra,
         0, peer.a6.sin6_addr.s6_addr, ntohs (peer.a6.sin6_port));
     }
     if (C) {
@@ -1726,7 +1735,7 @@ int create_new_connections (conn_target_job_t CTJ) /* {{{ */ {
         break;
       }
 
-      connection_job_t C = alloc_new_connection (cfd, CTJ, NULL,
+      connection_job_t C = alloc_new_connection (cfd, CTJ, NULL, ct_outbound, CT->type, CT->extra,
           ntohl (CT->target.s_addr), CT->target_ipv6, CT->port);
 
       if (C) {
