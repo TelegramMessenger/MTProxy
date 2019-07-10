@@ -636,7 +636,7 @@ connection_job_t alloc_new_connection (int cfd, conn_target_job_t CTJ, listening
   c->generation = new_conn_generation ();
   
   c->flags = 0;//SS ? C_WANTWR : C_WANTRD;
-  if (LC) {
+  if (basic_type == ct_inbound) {
     c->flags = C_CONNECTED;
   }
 

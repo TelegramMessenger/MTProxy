@@ -87,6 +87,7 @@ conn_type_t ct_tcp_rpc_ext_server = {
 
 int tcp_proxy_pass_parse_execute (connection_job_t C);
 int tcp_proxy_pass_close (connection_job_t C, int who);
+int tcp_proxy_pass_connected (connection_job_t C);
 int tcp_proxy_pass_write_packet (connection_job_t c, struct raw_message *raw); 
 
 conn_type_t ct_proxy_pass = {
@@ -95,10 +96,16 @@ conn_type_t ct_proxy_pass = {
   .title = "proxypass",
   .init_accepted = server_failed,
   .parse_execute = tcp_proxy_pass_parse_execute,
+  .connected = tcp_proxy_pass_connected,
   .close = tcp_proxy_pass_close,
   .write_packet = tcp_proxy_pass_write_packet,
   .connected = server_noop,
 };
+
+int tcp_proxy_pass_connected (connection_job_t C) {
+  vkprintf (1, "proxy pass connected'n");
+  return 0;
+}
 
 int tcp_proxy_pass_parse_execute (connection_job_t C) {
   struct connection_info *c = CONN_INFO(C);
@@ -111,12 +118,15 @@ int tcp_proxy_pass_parse_execute (connection_job_t C) {
 
   struct raw_message *r = malloc (sizeof (*r));
   rwm_move (r, &c->in);
+  rwm_init (&c->in, 0);
+  vkprintf (3, "proxying %d bytes to %s\n", r->total_bytes, show_remote_ip (E));
   mpq_push_w (e->out_queue, PTR_MOVE(r), 0);
   job_signal (JOB_REF_PASS (E), JS_RUN);
   return 0;
 }
 
 int tcp_proxy_pass_close (connection_job_t C, int who) {
+  vkprintf (1, "closing proxy pass conn\n");
   struct connection_info *c = CONN_INFO(C);
   if (c->extra) {
     job_t E = PTR_MOVE (c->extra);
@@ -841,6 +851,9 @@ static int is_allowed_timestamp (int timestamp) {
 }
 
 static int proxy_connection (connection_job_t C, const struct domain_info *info) {
+  struct connection_info *c = CONN_INFO(C);
+  assert (check_conn_functions (&ct_proxy_pass, 0) >= 0);
+
   const char zero[16] = {};
   if (info->target.s_addr == 0 && !memcmp (info->target_ipv6, zero, 16)) {
     vkprintf (0, "failed to proxy request to %s\n", info->domain);
@@ -848,31 +861,37 @@ static int proxy_connection (connection_job_t C, const struct domain_info *info)
     return 0;
   }
 
+  int port = c->remote_port == 80 ? 80 : 443;
+
   int cfd = -1;
   if (info->target.s_addr) {
-    cfd = client_socket (info->target.s_addr, 443, 0);
+    cfd = client_socket (info->target.s_addr, port, 0);
   } else {
-    cfd = client_socket_ipv6 (info->target_ipv6, 443, 0);
+    cfd = client_socket_ipv6 (info->target_ipv6, port, SM_IPV6);
   }
 
   if (cfd < 0) {
+    kprintf ("failed to create proxy pass conn: %d (%m)", errno);
     fail_connection (C, -27);
     return 0;
   }
 
-  struct connection_info *c = CONN_INFO(C);
   c->type->crypto_free (C);
   job_incref (C); 
-  job_t EJ = alloc_new_connection (cfd, NULL, NULL, ct_outbound, &ct_proxy_pass, C, ntohl (*(int *)&info->target.s_addr), (void *)info->target_ipv6, 443); 
+  job_t EJ = alloc_new_connection (cfd, NULL, NULL, ct_outbound, &ct_proxy_pass, C, ntohl (*(int *)&info->target.s_addr), (void *)info->target_ipv6, port); 
 
   if (!EJ) {
+    kprintf ("failed to create proxy pass conn (2)");
     job_decref_f (C);
     fail_connection (C, -37);
     return 0;
   }
 
   c->type = &ct_proxy_pass;
-  c->extra = PTR_MOVE(EJ);
+  c->extra = job_incref (EJ);
+      
+  assert (CONN_INFO(EJ)->io_conn);
+  unlock_job (JOB_REF_PASS (EJ));
 
   return c->type->parse_execute (C);
 }
