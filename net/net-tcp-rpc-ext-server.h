@@ -26,7 +26,6 @@
 #include "net/net-connections.h"
 
 extern conn_type_t ct_tcp_rpc_ext_server;
-// extern struct tcp_rpc_server_functions default_tcp_rpc_server;
 
 int tcp_rpcs_compact_parse_execute (connection_job_t c);
 

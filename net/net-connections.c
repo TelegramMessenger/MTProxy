@@ -602,7 +602,7 @@ connection_job_t alloc_new_connection (int cfd, conn_target_job_t CTJ, listening
 
   unsigned flags;
   if ((flags = fcntl (cfd, F_GETFL, 0) < 0) || fcntl (cfd, F_SETFL, flags | O_NONBLOCK) < 0) {
-    kprintf ("cannot set O_NONBLOCK on accepted socket %d: %m\n", cfd);
+    kprintf ("cannot set O_NONBLOCK on accepted socket #%d: %m\n", cfd);
     MODULE_STAT->accept_nonblock_set_failed ++;
     close (cfd);
     return NULL;
@@ -697,9 +697,9 @@ connection_job_t alloc_new_connection (int cfd, conn_target_job_t CTJ, listening
   //c->out_packet_queue = alloc_mp_queue_w ();
   
   if (basic_type == ct_outbound) {
-    vkprintf (1, "New connection %s:%d -> %s:%d\n", show_our_ip (C), c->our_port, show_remote_ip (C), c->remote_port);
+    vkprintf (1, "New outbound connection #%d %s:%d -> %s:%d\n", c->fd, show_our_ip (C), c->our_port, show_remote_ip (C), c->remote_port);
   } else {
-    vkprintf (1, "New connection %s:%d -> %s:%d\n", show_remote_ip (C), c->remote_port, show_our_ip (C), c->our_port);
+    vkprintf (1, "New inbound connection #%d %s:%d -> %s:%d\n", c->fd, show_remote_ip (C), c->remote_port, show_our_ip (C), c->our_port);
   }
 
 
@@ -750,13 +750,13 @@ connection_job_t alloc_new_connection (int cfd, conn_target_job_t CTJ, listening
       }
       if (c->window_clamp) {
         if (setsockopt (cfd, IPPROTO_TCP, TCP_WINDOW_CLAMP, &c->window_clamp, 4) < 0) {
-          vkprintf (0, "error while setting window size for socket %d to %d: %m\n", cfd, c->window_clamp);
+          vkprintf (0, "error while setting window size for socket #%d to %d: %m\n", cfd, c->window_clamp);
         } else {
           int t1 = -1, t2 = -1;
           socklen_t s1 = 4, s2 = 4;
           getsockopt (cfd, IPPROTO_TCP, TCP_WINDOW_CLAMP, &t1, &s1);
           getsockopt (cfd, SOL_SOCKET, SO_RCVBUF, &t2, &s2);
-          vkprintf (2, "window clamp for socket %d is %d, receive buffer is %d\n", cfd, t1, t2);
+          vkprintf (2, "window clamp for socket #%d is %d, receive buffer is %d\n", cfd, t1, t2);
         }
       }
       
@@ -1132,7 +1132,7 @@ int net_server_socket_read_write_gateway (int fd, void *data, event_t *ev) /* {{
       return EVA_REMOVE;
     }
     if (ev->epoll_ready & (EPOLLHUP | EPOLLERR | EPOLLRDHUP | EPOLLPRI)) {
-      vkprintf (!(ev->epoll_ready & EPOLLPRI), "socket %d: disconnected (epoll_ready=%02x), cleaning\n", c->fd, ev->epoll_ready);
+      vkprintf (!(ev->epoll_ready & EPOLLPRI), "socket #%d: disconnected (epoll_ready=%02x), cleaning\n", c->fd, ev->epoll_ready);
 
       job_signal (JOB_REF_CREATE_PASS (C), JS_ABORT);
       return EVA_REMOVE;
@@ -1720,12 +1720,14 @@ int create_new_connections (conn_target_job_t CTJ) /* {{{ */ {
     }
 
     while (CT->outbound_connections < need_c) {
+      int cfd = -1;
       if (CT->target.s_addr) {
-        vkprintf (1, "Creating NEW connection to %s:%d\n", inet_ntoa (CT->target), CT->port);
+        cfd = client_socket (CT->target.s_addr, CT->port, 0);
+        vkprintf (1, "Created NEW connection #%d to %s:%d\n", cfd, inet_ntoa (CT->target), CT->port);
       } else {
-        vkprintf (1, "Creating NEW ipv6 connection to [%s]:%d\n", show_ipv6 (CT->target_ipv6), CT->port);
+        cfd = client_socket_ipv6 (CT->target_ipv6, CT->port, SM_IPV6);
+        vkprintf (1, "Created NEW ipv6 connection #%d to [%s]:%d\n", cfd, show_ipv6 (CT->target_ipv6), CT->port);
       }
-      int cfd = CT->target.s_addr ? client_socket (CT->target.s_addr, CT->port, 0) : client_socket_ipv6 (CT->target_ipv6, CT->port, SM_IPV6);
       if (cfd < 0) {
         if (CT->target.s_addr) {
           vkprintf (1, "error connecting to %s:%d: %m\n", inet_ntoa (CT->target), CT->port);

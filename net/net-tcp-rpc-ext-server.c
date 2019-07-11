@@ -103,7 +103,8 @@ conn_type_t ct_proxy_pass = {
 };
 
 int tcp_proxy_pass_connected (connection_job_t C) {
-  vkprintf (1, "proxy pass connected'n");
+  struct connection_info *c = CONN_INFO(C);
+  vkprintf (1, "proxy pass connected #%d %s:%d -> %s:%d\n", c->fd, show_our_ip (C), c->our_port, show_remote_ip (C), c->remote_port);
   return 0;
 }
 
@@ -119,15 +120,15 @@ int tcp_proxy_pass_parse_execute (connection_job_t C) {
   struct raw_message *r = malloc (sizeof (*r));
   rwm_move (r, &c->in);
   rwm_init (&c->in, 0);
-  vkprintf (3, "proxying %d bytes to %s\n", r->total_bytes, show_remote_ip (E));
+  vkprintf (3, "proxying %d bytes to %s:%d\n", r->total_bytes, show_remote_ip (E), e->remote_port);
   mpq_push_w (e->out_queue, PTR_MOVE(r), 0);
   job_signal (JOB_REF_PASS (E), JS_RUN);
   return 0;
 }
 
 int tcp_proxy_pass_close (connection_job_t C, int who) {
-  vkprintf (1, "closing proxy pass conn\n");
   struct connection_info *c = CONN_INFO(C);
+  vkprintf (1, "closing proxy pass connection #%d %s:%d -> %s:%d\n", c->fd, show_our_ip (C), c->our_port, show_remote_ip (C), c->remote_port);
   if (c->extra) {
     job_t E = PTR_MOVE (c->extra);
     fail_connection (E, -23);
@@ -150,19 +151,6 @@ void tcp_rpcs_set_ext_secret (unsigned char secret[16]) {
   assert (ext_secret_cnt < 16);
   memcpy (ext_secret[ext_secret_cnt ++], secret, 16);
 }
-
-/*
-struct tcp_rpc_server_functions default_tcp_rpc_ext_server = {
-  .execute = tcp_rpcs_default_execute,
-  .check_ready = server_check_ready,
-  .flush_packet = tcp_rpc_flush_packet,
-  .rpc_wakeup = tcp_rpcs_do_wakeup,
-  .rpc_alarm = tcp_rpcs_do_wakeup,
-  .rpc_check_perm = tcp_rpcs_default_check_perm,
-  .rpc_init_crypto = tcp_rpcs_init_crypto,
-  .rpc_ready = server_noop,
-};
-*/
 
 static int allow_only_tls;
 
@@ -861,7 +849,7 @@ static int proxy_connection (connection_job_t C, const struct domain_info *info)
     return 0;
   }
 
-  int port = c->remote_port == 80 ? 80 : 443;
+  int port = c->our_port == 80 ? 80 : 443;
 
   int cfd = -1;
   if (info->target.s_addr) {
@@ -871,7 +859,7 @@ static int proxy_connection (connection_job_t C, const struct domain_info *info)
   }
 
   if (cfd < 0) {
-    kprintf ("failed to create proxy pass conn: %d (%m)", errno);
+    kprintf ("failed to create proxy pass connection: %d (%m)", errno);
     fail_connection (C, -27);
     return 0;
   }
@@ -881,7 +869,7 @@ static int proxy_connection (connection_job_t C, const struct domain_info *info)
   job_t EJ = alloc_new_connection (cfd, NULL, NULL, ct_outbound, &ct_proxy_pass, C, ntohl (*(int *)&info->target.s_addr), (void *)info->target_ipv6, port); 
 
   if (!EJ) {
-    kprintf ("failed to create proxy pass conn (2)");
+    kprintf ("failed to create proxy pass connection (2)");
     job_decref_f (C);
     fail_connection (C, -37);
     return 0;
