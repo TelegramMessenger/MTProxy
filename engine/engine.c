@@ -685,7 +685,7 @@ static void parse_option_engine_builtin (const char *name, int arg, int *var, in
   assert (vasprintf (&h, help, ap) >= 0);
   va_end (ap);
 
-  parse_option_ex (name, arg, var, val, flags, f_parse_option_engine, h);
+  parse_option_ex (name, arg, var, val, flags, f_parse_option_engine, "%s", h);
 
   free (h);
 }
