@@ -1048,6 +1048,23 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
           RETURN_TLS_ERROR(info);
         }
 
+        int pos = 76;
+        int cipher_suites_length = read_length (client_hello, &pos);
+        if (pos + cipher_suites_length > read_len) {
+          vkprintf (1, "Too long cipher suites list of length %d\n", cipher_suites_length);
+          RETURN_TLS_ERROR(info);
+        }
+        while (cipher_suites_length >= 2 && (client_hello[pos] & 0x0F) == 0x0A && (client_hello[pos + 1] & 0x0F) == 0x0A) {
+          // skip grease
+          cipher_suites_length -= 2;
+          pos += 2;
+        }
+        if (cipher_suites_length <= 1 || client_hello[pos] != 0x13 || client_hello[pos + 1] < 0x01 || client_hello[pos + 1] > 0x03) {
+          vkprintf (1, "Can't find supported cipher suite\n");
+          RETURN_TLS_ERROR(info);
+        }
+        unsigned char cipher_suite_id = client_hello[pos + 1];
+
         assert (rwm_skip_data (&c->in, len) == len);
         c->flags |= C_IS_TLS;
         c->left_tls_packet_length = -1;
@@ -1061,10 +1078,11 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
         memcpy (response_buffer, "\x16\x03\x03\x00\x7a\x02\x00\x00\x76\x03\x03", 11);
         memset (response_buffer + 11, '\0', 32);
         response_buffer[43] = '\x20';
-        memcpy (response_buffer + 44, client_random, 32);
+        memcpy (response_buffer + 44, client_hello + 44, 32);
         memcpy (response_buffer + 76, "\x13\x01\x00\x00\x2e", 5);
+        response_buffer[77] = cipher_suite_id;
 
-        int pos = 81;
+        pos = 81;
         int tls_server_extensions[3] = {0x33, 0x2b, -1};
         if (info->is_reversed_extension_order) {
           int t = tls_server_extensions[0];
