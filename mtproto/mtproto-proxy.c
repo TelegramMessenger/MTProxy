@@ -107,11 +107,11 @@ const char FullVersionStr[] = VERSION_STR " compiled at " __DATE__ " " __TIME__ 
 #define MAX_MTFRONT_NB			((NB_max * 3) >> 2)
 #endif
 
-double ping_interval = PING_INTERVAL;
-int window_clamp = DEFAULT_WINDOW_CLAMP;
+static double ping_interval = PING_INTERVAL;
+static int window_clamp;
 
 #define	PROXY_MODE_OUT	2
-int proxy_mode;
+static int proxy_mode;
 
 #define IS_PROXY_IN	0
 #define IS_PROXY_OUT	1
@@ -2085,16 +2085,21 @@ static int secret_count;
 void mtfront_pre_loop (void) {
   int i, enable_ipv6 = engine_check_ipv6_enabled () ? SM_IPV6 : 0;
   tcp_maximize_buffers = 1;
+  if (window_clamp == 0 && domain_count == 0) {
+    window_clamp = DEFAULT_WINDOW_CLAMP;
+  }
   if (!workers) {
     for (i = 0; i < http_ports_num; i++) {
       init_listening_tcpv6_connection (http_sfd[i], &ct_tcp_rpc_ext_server_mtfront, &ext_rpc_methods, enable_ipv6 | SM_LOWPRIO | SM_NOQACK | (max_special_connections ? SM_SPECIAL : 0));
-      //     assert (setsockopt (http_sfd[i], IPPROTO_TCP, TCP_MAXSEG, (int[]){1410}, sizeof (int)) >= 0);
-      //     assert (setsockopt (http_sfd[i], IPPROTO_TCP, TCP_NODELAY, (int[]){1}, sizeof (int)) >= 0);
-      listening_connection_job_t LC = Events[http_sfd[i]].data;
-      assert (LC);
-      CONN_INFO(LC)->window_clamp = window_clamp;
-      if (setsockopt (http_sfd[i], IPPROTO_TCP, TCP_WINDOW_CLAMP, &window_clamp, 4) < 0) {
-	vkprintf (0, "error while setting window size for socket #%d to %d: %m\n", http_sfd[i], window_clamp);
+      // assert (setsockopt (http_sfd[i], IPPROTO_TCP, TCP_MAXSEG, (int[]){1410}, sizeof (int)) >= 0);
+      // assert (setsockopt (http_sfd[i], IPPROTO_TCP, TCP_NODELAY, (int[]){1}, sizeof (int)) >= 0);
+      if (window_clamp) {
+        listening_connection_job_t LC = Events[http_sfd[i]].data;
+        assert (LC);
+        CONN_INFO(LC)->window_clamp = window_clamp;
+        if (setsockopt (http_sfd[i], IPPROTO_TCP, TCP_WINDOW_CLAMP, &window_clamp, 4) < 0) {
+          vkprintf (0, "error while setting window size for socket #%d to %d: %m\n", http_sfd[i], window_clamp);
+        }
       }
     }
     // create_all_outbound_connections ();
