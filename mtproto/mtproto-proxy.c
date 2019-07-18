@@ -2092,7 +2092,7 @@ void mtfront_pre_loop (void) {
   }
   if (!workers) {
     for (i = 0; i < http_ports_num; i++) {
-      init_listening_tcpv6_connection (http_sfd[i], &ct_tcp_rpc_ext_server_mtfront, &ext_rpc_methods, enable_ipv6 | SM_LOWPRIO | SM_NOQACK | (max_special_connections ? SM_SPECIAL : 0));
+      init_listening_tcpv6_connection (http_sfd[i], &ct_tcp_rpc_ext_server_mtfront, &ext_rpc_methods, enable_ipv6 | SM_LOWPRIO | (domain_count == 0 ? SM_NOQACK : 0) | (max_special_connections ? SM_SPECIAL : 0));
       // assert (setsockopt (http_sfd[i], IPPROTO_TCP, TCP_MAXSEG, (int[]){1410}, sizeof (int)) >= 0);
       // assert (setsockopt (http_sfd[i], IPPROTO_TCP, TCP_NODELAY, (int[]){1}, sizeof (int)) >= 0);
       if (window_clamp) {
