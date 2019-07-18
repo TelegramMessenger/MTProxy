@@ -568,7 +568,6 @@ int server_socket (int port, struct in_addr in_addr, int backlog, int mode) {
     maximize_sndbuf (socket_fd, 0);
     maximize_rcvbuf (socket_fd, 0);
     setsockopt (socket_fd, SOL_IP, IP_RECVERR, &flags, sizeof (flags));
-  
   } else {
     setsockopt (socket_fd, SOL_SOCKET, SO_REUSEADDR, &flags, sizeof (flags));
     if (tcp_maximize_buffers) {
@@ -689,7 +688,6 @@ int client_socket (in_addr_t in_addr, int port, int mode) {
   }
 
   return socket_fd;
-
 }
 
 int client_socket_ipv6 (const unsigned char in6_addr_ptr[16], int port, int mode) {
@@ -731,7 +729,6 @@ int client_socket_ipv6 (const unsigned char in6_addr_ptr[16], int port, int mode
   }
 
   return socket_fd;
-
 }
 
 unsigned get_my_ipv4 (void) {
@@ -899,4 +896,3 @@ const char *show_ipv6 (const unsigned char ipv6[16]) {
   ptr += conv_ipv6_internal ((const unsigned short *) ipv6, ptr) + 1;
   return res;
 }
-

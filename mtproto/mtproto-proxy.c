@@ -2084,9 +2084,11 @@ static int secret_count;
 
 void mtfront_pre_loop (void) {
   int i, enable_ipv6 = engine_check_ipv6_enabled () ? SM_IPV6 : 0;
-  tcp_maximize_buffers = 1;
-  if (window_clamp == 0 && domain_count == 0) {
-    window_clamp = DEFAULT_WINDOW_CLAMP;
+  if (domain_count == 0) {
+    tcp_maximize_buffers = 1;
+    if (window_clamp == 0) {
+      window_clamp = DEFAULT_WINDOW_CLAMP;
+    }
   }
   if (!workers) {
     for (i = 0; i < http_ports_num; i++) {

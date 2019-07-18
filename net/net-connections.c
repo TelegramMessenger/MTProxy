@@ -333,17 +333,6 @@ static inline void cond_disable_qack (socket_connection_job_t C) {
 }
 /* }}} */
 
-/* {{{ cork
-static inline void cond_reset_cork (connection_job_t c) {
-  if (c->flags & C_NOQACK) {
-    vkprintf (2, "disable TCP_CORK for %d\n", c->fd);
-    assert (setsockopt (c->fd, IPPROTO_TCP, TCP_CORK, (int[]){0}, sizeof (int)) >= 0);
-    vkprintf (2, "enable TCP_CORK for %d\n", c->fd);
-    assert (setsockopt (c->fd, IPPROTO_TCP, TCP_CORK, (int[]){1}, sizeof (int)) >= 0);
-  }
-}
-}}} */
-
 
 
 /* {{{ CPU PART OF CONNECTION */ 
@@ -759,7 +748,6 @@ connection_job_t alloc_new_connection (int cfd, conn_target_job_t CTJ, listening
           vkprintf (2, "window clamp for socket #%d is %d, receive buffer is %d\n", cfd, t1, t2);
         }
       }
-      
     }
 
     alloc_new_socket_connection (C);
