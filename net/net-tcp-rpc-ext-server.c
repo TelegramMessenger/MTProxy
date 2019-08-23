@@ -34,6 +34,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <openssl/bn.h>
 #include <openssl/rand.h>
 
 #include "common/kprintf.h"
@@ -200,6 +201,95 @@ static int get_domain_server_hello_encrypted_size (const struct domain_info *inf
 
 #define TLS_REQUEST_LENGTH 517
 
+static BIGNUM *get_y2 (BIGNUM *x, const BIGNUM *mod, BN_CTX *big_num_context) {
+  // returns y^2 = x^3 + 486662 * x^2 + x
+  BIGNUM *y = BN_dup (x);
+  assert (y != NULL);
+  BIGNUM *coef = BN_new();
+  assert (BN_set_word (coef, 486662) == 1);
+  assert (BN_mod_add (y, y, coef, mod, big_num_context) == 1);
+  assert (BN_mod_mul (y, y, x, mod, big_num_context) == 1);
+  assert (BN_one (coef) == 1);
+  assert (BN_mod_add (y, y, coef, mod, big_num_context) == 1);
+  assert (BN_mod_mul (y, y, x, mod, big_num_context) == 1);
+  BN_clear_free (coef);
+  return y;
+}
+
+static BIGNUM *get_double_x (BIGNUM *x, const BIGNUM *mod, BN_CTX *big_num_context) {
+  // returns x_2 = (x^2 - 1)^2/(4*y^2)
+  BIGNUM *denominator = get_y2 (x, mod, big_num_context);
+  assert (denominator != NULL);
+  BIGNUM *coef = BN_new();
+  assert (BN_set_word (coef, 4) == 1);
+  assert (BN_mod_mul (denominator, denominator, coef, mod, big_num_context) == 1);
+
+  BIGNUM *numerator = BN_new();
+  assert (numerator != NULL);
+  assert (BN_mod_mul (numerator, x, x, mod, big_num_context) == 1);
+  assert (BN_one (coef) == 1);
+  assert (BN_mod_sub (numerator, numerator, coef, mod, big_num_context) == 1);
+  assert (BN_mod_mul (numerator, numerator, numerator, mod, big_num_context) == 1);
+
+  assert (BN_mod_inverse (denominator, denominator, mod, big_num_context) == denominator);
+  assert (BN_mod_mul (numerator, numerator, denominator, mod, big_num_context) == 1);
+
+  BN_clear_free (coef);
+  BN_clear_free (denominator);
+  return numerator;
+}
+
+static void generate_public_key (unsigned char key[32]) {
+  BIGNUM *mod = NULL;
+  assert (BN_hex2bn (&mod, "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffed") == 64);
+  BIGNUM *pow = NULL;
+  assert (BN_hex2bn (&pow, "3ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff6") == 64);
+  BN_CTX *big_num_context = BN_CTX_new();
+  assert (big_num_context != NULL);
+
+  BIGNUM *x = BN_new();
+  while (1) {
+    assert (RAND_bytes (key, 32) == 1);
+    key[31] &= 127;
+    BN_bin2bn (key, 32, x);
+    assert (x != NULL);
+    assert (BN_mod_mul (x, x, x, mod, big_num_context) == 1);
+
+    BIGNUM *y = get_y2 (x, mod, big_num_context);
+
+    BIGNUM *r = BN_new();
+    assert (BN_mod_exp (r, y, pow, mod, big_num_context) == 1);
+    BN_clear_free (y);
+    if (BN_is_one (r)) {
+      BN_clear_free (r);
+      break;
+    }
+    BN_clear_free (r);
+  }
+
+  int i;
+  for (i = 0; i < 3; i++) {
+    BIGNUM *x2 = get_double_x (x, mod, big_num_context);
+    BN_clear_free (x);
+    x = x2;
+  }
+
+  int num_size = BN_num_bytes (x);
+  assert (num_size <= 32);
+  memset (key, '\0', 32 - num_size);
+  assert (BN_bn2bin (x, key + (32 - num_size)) == num_size);
+  for (i = 0; i < 16; i++) {
+    unsigned char t = key[i];
+    key[i] = key[31 - i];
+    key[31 - i] = t;
+  }
+
+  BN_clear_free (x);
+  BN_CTX_free (big_num_context);
+  BN_clear_free (pow);
+  BN_clear_free (mod);
+}
+
 static void add_string (unsigned char *str, int *pos, const char *data, int data_len) {
   assert (*pos + data_len <= TLS_REQUEST_LENGTH);
   memcpy (str + (*pos), data, data_len);
@@ -224,6 +314,12 @@ static void add_grease (unsigned char *str, int *pos, const unsigned char *greas
   str[*pos + 0] = greases[num];
   str[*pos + 1] = greases[num];
   (*pos) += 2;
+}
+
+static void add_public_key (unsigned char *str, int *pos) {
+  assert (*pos + 32 <= TLS_REQUEST_LENGTH);
+  generate_public_key (str + (*pos));
+  (*pos) += 32;
 }
 
 static unsigned char *create_request (const char *domain) {
@@ -270,7 +366,7 @@ static unsigned char *create_request (const char *domain) {
                             "\x33\x00\x2b\x00\x29", 77);
   add_grease (result, &pos, greases, 4);
   add_string (result, &pos, "\x00\x01\x00\x00\x1d\x00\x20", 7);
-  add_random (result, &pos, 32);
+  add_public_key (result, &pos);
   add_string (result, &pos, "\x00\x2d\x00\x02\x01\x01\x00\x2b\x00\x0b\x0a", 11);
   add_grease (result, &pos, greases, 6);
   add_string (result, &pos, "\x03\x04\x03\x03\x03\x02\x03\x01\x00\x1b\x00\x03\x02\x00\x02", 15);
@@ -1094,7 +1190,7 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
           if (tls_server_extensions[i] == 0x33) {
             assert (pos + 40 <= response_size);
             memcpy (response_buffer + pos, "\x00\x33\x00\x24\x00\x1d\x00\x20", 8);
-            RAND_bytes (response_buffer + pos + 8, 32);
+            generate_public_key (response_buffer + pos + 8);
             pos += 40;
           } else if (tls_server_extensions[i] == 0x2b) {
             assert (pos + 5 <= response_size);
