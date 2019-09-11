@@ -2244,7 +2244,7 @@ void mtfront_prepare_parse_options (void) {
   parse_option ("window-clamp", required_argument, 0, 'W', "sets window clamp for client TCP connections");
   parse_option ("http-ports", required_argument, 0, 'H', "comma-separated list of client (HTTP) ports to listen");
   // parse_option ("outbound-connections-ps", required_argument, 0, 'o', "limits creation rate of outbound connections to mtproto-servers (default %d)", DEFAULT_OUTBOUND_CONNECTION_CREATION_RATE);
-  parse_option ("slaves", required_argument, 0, 'M', "spawn several slave workers; not supported for TLS-transport mode");
+  parse_option ("slaves", required_argument, 0, 'M', "spawn several slave workers; not recommended for TLS-transport mode for better replay protection");
   parse_option ("ping-interval", required_argument, 0, 'T', "sets ping interval in second for local TCP connections (default %.3lf)", PING_INTERVAL);
 }
 
@@ -2274,11 +2274,10 @@ void mtfront_pre_init (void) {
     tcp_rpc_init_proxy_domains();
 
     if (workers) {
-      kprintf ("Workers can't be used when a domain for TLS transport is specified");
-      workers = 0;
+      kprintf ("It is recommended to not use workers with TLS-transport");
     }
     if (secret_count == 0) {
-      kprintf ("You must specify at least one mtproto-secret to use when using TLS transport");
+      kprintf ("You must specify at least one mtproto-secret to use when using TLS-transport");
       exit (2);
     }
   }
