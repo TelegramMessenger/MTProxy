@@ -559,7 +559,7 @@ int server_socket (int port, struct in_addr in_addr, int backlog, int mode) {
   int socket_fd;
   // struct linger ling = {0, 0};
   int flags = 1;
-  int enable_tcp_keep_alive = 0;
+  int enable_often_tcp_keep_alive = 0;
 
   if ((socket_fd = new_socket (mode, 1)) == -1) {
     return -1;
@@ -579,10 +579,9 @@ int server_socket (int port, struct in_addr in_addr, int backlog, int mode) {
     // setsockopt (socket_fd, SOL_SOCKET, SO_LINGER, &ling, sizeof (ling));
     setsockopt (socket_fd, IPPROTO_TCP, TCP_NODELAY, &flags, sizeof (flags));
 
-    if (enable_tcp_keep_alive) {
-      assert (flags == 1);
-      assert (setsockopt (socket_fd, SOL_SOCKET, SO_KEEPALIVE, &flags, sizeof (flags)) >= 0);
-
+    assert (flags == 1);
+    assert (setsockopt (socket_fd, SOL_SOCKET, SO_KEEPALIVE, &flags, sizeof (flags)) >= 0);
+    if (enable_often_tcp_keep_alive) {
       int x = 40;
       assert (setsockopt (socket_fd, IPPROTO_TCP, TCP_KEEPIDLE, &x, sizeof (x)) >= 0);
       assert (setsockopt (socket_fd, IPPROTO_TCP, TCP_KEEPINTVL, &x, sizeof (x)) >= 0);
