@@ -66,19 +66,21 @@
  */
 
 int tcp_rpcs_compact_parse_execute (connection_job_t c);
+int tcp_rpcs_ext_alarm (connection_job_t c);
+int tcp_rpcs_ext_init_accepted (connection_job_t c);
 
 conn_type_t ct_tcp_rpc_ext_server = {
   .magic = CONN_FUNC_MAGIC,
   .flags = C_RAWMSG,
   .title = "rpc_ext_server",
-  .init_accepted = tcp_rpcs_init_accepted_nohs,
+  .init_accepted = tcp_rpcs_ext_init_accepted,
   .parse_execute = tcp_rpcs_compact_parse_execute,
   .close = tcp_rpcs_close_connection,
   .flush = tcp_rpc_flush,
   .write_packet = tcp_rpc_write_packet_compact,
   .connected = server_failed,
   .wakeup = tcp_rpcs_wakeup,
-  .alarm = tcp_rpcs_alarm,
+  .alarm = tcp_rpcs_ext_alarm,
   .crypto_init = aes_crypto_ctr128_init,
   .crypto_free = aes_crypto_free,
   .crypto_encrypt_output = cpu_tcp_aes_crypto_ctr128_encrypt_output,
@@ -980,12 +982,29 @@ static int proxy_connection (connection_job_t C, const struct domain_info *info)
   return c->type->parse_execute (C);
 }
 
+int tcp_rpcs_ext_alarm (connection_job_t C) {
+  struct tcp_rpc_data *D = TCP_RPC_DATA (C);
+  if (D->in_packet_num == -3) {
+    return proxy_connection (C, default_domain_info);  
+  } else {
+    return 0;
+  }
+}
+
+int tcp_rpcs_ext_init_accepted (connection_job_t C) {
+  job_timer_insert (C, precise_now + 10);
+  return tcp_rpcs_init_accepted_nohs (C);
+}
+
 int tcp_rpcs_compact_parse_execute (connection_job_t C) {
 #define RETURN_TLS_ERROR(info) \
   return proxy_connection (C, info);  
 
   struct tcp_rpc_data *D = TCP_RPC_DATA (C);
   if (D->crypto_flags & RPCF_COMPACT_OFF) {
+    if (D->in_packet_num != -3) {
+      job_timer_remove (C);
+    }
     return tcp_rpcs_parse_execute (C);
   }
 
@@ -995,6 +1014,9 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
   vkprintf (4, "%s. in_total_bytes = %d\n", __func__, c->in.total_bytes);
 
   while (1) {
+    if (D->in_packet_num != -3) {
+      job_timer_remove (C);
+    }
     if (c->flags & C_ERROR) {
       return NEED_MORE_BYTES;
     }
