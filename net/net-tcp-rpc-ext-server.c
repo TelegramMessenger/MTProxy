@@ -984,7 +984,7 @@ static int proxy_connection (connection_job_t C, const struct domain_info *info)
 
 int tcp_rpcs_ext_alarm (connection_job_t C) {
   struct tcp_rpc_data *D = TCP_RPC_DATA (C);
-  if (D->in_packet_num == -3) {
+  if (D->in_packet_num == -3 && default_domain_info != NULL) {
     return proxy_connection (C, default_domain_info);  
   } else {
     return 0;
