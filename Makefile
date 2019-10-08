@@ -12,8 +12,6 @@ ifeq ($m, 64)
 ARCH = -m64
 endif
 
-CFLAGS = $(ARCH) -O3 -std=gnu11 -Wall -mpclmul -march=core2 -mfpmath=sse -mssse3 -fno-strict-aliasing -fno-strict-overflow -fwrapv -DAES=1 -DCOMMIT=\"${COMMIT}\" -D_GNU_SOURCE=1 -D_FILE_OFFSET_BITS=64
-LDFLAGS = $(ARCH) -ggdb -rdynamic -lm -lrt -lcrypto -lz -lpthread -lcrypto
 
 LIB = ${OBJ}/lib
 CINCLUDE = -iquote common -iquote .
@@ -73,7 +71,13 @@ DEPENDENCE_ALL		:=	${DEPENDENCE_NORM} ${DEPENDENCE_STRANGE} ${DEPENDENCE_LIB}
 
 OBJECTS_ALL		:=	${OBJECTS} ${LIB_OBJS}
 
-all:	${ALLDIRS} ${EXELIST} 
+all:
+	$(MAKE) meta-build
+
+debug:
+	$(MAKE) DEBUG="-g" meta-build
+
+meta-build:	${ALLDIRS} ${EXELIST} 
 dirs: ${ALLDIRS}
 create_dirs_and_headers: ${ALLDIRS} 
 
@@ -81,6 +85,9 @@ ${ALLDIRS}:
 	@test -d $@ || mkdir -p $@
 
 -include ${DEPENDENCE_ALL}
+
+CFLAGS = $(ARCH) -O3 -std=gnu11 -Wall -mpclmul -march=core2 -mfpmath=sse -mssse3 -fno-strict-aliasing -fno-strict-overflow -fwrapv -DAES=1 -DCOMMIT=\"${COMMIT}\" -D_GNU_SOURCE=1 -D_FILE_OFFSET_BITS=64 ${DEBUG}
+LDFLAGS = $(ARCH) -ggdb -rdynamic -lm -lrt -lcrypto -lz -lpthread -lcrypto
 
 ${OBJECTS}: ${OBJ}/%.o: %.c | create_dirs_and_headers
 	${CC} ${CFLAGS} ${CINCLUDE} -c -MP -MD -MF ${DEP}/$*.d -MQ ${OBJ}/$*.o -o $@ $<
