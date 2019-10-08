@@ -557,8 +557,9 @@ struct in_addr settings_addr;
 
 int server_socket (int port, struct in_addr in_addr, int backlog, int mode) {
   int socket_fd;
-  struct linger ling = {0, 0};
+  // struct linger ling = {0, 0};
   int flags = 1;
+  int enable_often_tcp_keep_alive = 0;
 
   if ((socket_fd = new_socket (mode, 1)) == -1) {
     return -1;
@@ -568,23 +569,25 @@ int server_socket (int port, struct in_addr in_addr, int backlog, int mode) {
     maximize_sndbuf (socket_fd, 0);
     maximize_rcvbuf (socket_fd, 0);
     setsockopt (socket_fd, SOL_IP, IP_RECVERR, &flags, sizeof (flags));
-  
   } else {
     setsockopt (socket_fd, SOL_SOCKET, SO_REUSEADDR, &flags, sizeof (flags));
     if (tcp_maximize_buffers) {
       maximize_sndbuf (socket_fd, 0);
       maximize_rcvbuf (socket_fd, 0);
     }
-    assert (setsockopt (socket_fd, SOL_SOCKET, SO_KEEPALIVE, &flags, sizeof (flags)) >= 0);
     assert (flags == 1);
-    setsockopt (socket_fd, SOL_SOCKET, SO_LINGER, &ling, sizeof (ling));
+    // setsockopt (socket_fd, SOL_SOCKET, SO_LINGER, &ling, sizeof (ling));
     setsockopt (socket_fd, IPPROTO_TCP, TCP_NODELAY, &flags, sizeof (flags));
 
-    int x = 40;
-    assert (setsockopt (socket_fd, IPPROTO_TCP, TCP_KEEPIDLE, &x, sizeof (x)) >= 0);
-    assert (setsockopt (socket_fd, IPPROTO_TCP, TCP_KEEPINTVL, &x, sizeof (x)) >= 0);
-    x = 5;
-    assert (setsockopt (socket_fd, IPPROTO_TCP, TCP_KEEPCNT, &x, sizeof (x)) >= 0);
+    assert (flags == 1);
+    assert (setsockopt (socket_fd, SOL_SOCKET, SO_KEEPALIVE, &flags, sizeof (flags)) >= 0);
+    if (enable_often_tcp_keep_alive) {
+      int x = 40;
+      assert (setsockopt (socket_fd, IPPROTO_TCP, TCP_KEEPIDLE, &x, sizeof (x)) >= 0);
+      assert (setsockopt (socket_fd, IPPROTO_TCP, TCP_KEEPINTVL, &x, sizeof (x)) >= 0);
+      x = 5;
+      assert (setsockopt (socket_fd, IPPROTO_TCP, TCP_KEEPCNT, &x, sizeof (x)) >= 0);
+    }
   }
 
   if (mode & SM_REUSE) {
@@ -689,7 +692,6 @@ int client_socket (in_addr_t in_addr, int port, int mode) {
   }
 
   return socket_fd;
-
 }
 
 int client_socket_ipv6 (const unsigned char in6_addr_ptr[16], int port, int mode) {
@@ -731,7 +733,6 @@ int client_socket_ipv6 (const unsigned char in6_addr_ptr[16], int port, int mode
   }
 
   return socket_fd;
-
 }
 
 unsigned get_my_ipv4 (void) {
@@ -899,4 +900,3 @@ const char *show_ipv6 (const unsigned char ipv6[16]) {
   ptr += conv_ipv6_internal ((const unsigned short *) ipv6, ptr) + 1;
   return res;
 }
-

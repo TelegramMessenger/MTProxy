@@ -54,35 +54,36 @@
 
 
 /* for connection flags */
-#define	C_WANTRD	1
-#define	C_WANTWR	2
-#define	C_WANTRW	(C_WANTRD | C_WANTWR)
-#define	C_INCONN	4
-#define	C_ERROR		8
-#define	C_NORD		0x10
-#define	C_NOWR		0x20
-#define	C_NORW		(C_NORD | C_NOWR)
-#define	C_INQUERY	0x40
-#define	C_FAILED	0x80
-#define	C_ALARM		0x100
+#define C_WANTRD	1
+#define C_WANTWR	2
+#define C_WANTRW	(C_WANTRD | C_WANTWR)
+#define C_INCONN	4
+#define C_ERROR		8
+#define C_NORD		0x10
+#define C_NOWR		0x20
+#define C_NORW		(C_NORD | C_NOWR)
+#define C_INQUERY	0x40
+#define C_FAILED	0x80
+#define C_ALARM		0x100
 #define C_AIO		0x200
 #define C_INTIMEOUT	0x400
-#define	C_STOPREAD	0x800
-#define	C_REPARSE	0x1000
+#define C_STOPREAD	0x800
+#define C_REPARSE	0x1000
 #define C_DFLUSH	0x2000
-#define	C_IPV6		0x4000
+#define C_IPV6		0x4000
 #define C_EXTERNAL     	0x8000
 #define C_SPECIAL	0x10000
-#define	C_NOQACK	0x20000
-#define	C_RAWMSG	0x40000
-#define C_NET_FAILED 0x80000
-#define	C_CRYPTOIN	0x100000
-#define	C_CRYPTOOUT	0x200000
-#define C_STOPPARSE 0x400000
+#define C_NOQACK	0x20000
+#define C_RAWMSG	0x40000
+#define C_NET_FAILED	0x80000
+#define C_CRYPTOIN	0x100000
+#define C_CRYPTOOUT	0x200000
+#define C_STOPPARSE	0x400000
 #define C_ISDH		0x800000
 #define C_READY_PENDING 0x1000000
-#define C_CONNECTED 0x2000000
-#define	C_STOPWRITE	0x4000000
+#define C_CONNECTED	0x2000000
+#define C_STOPWRITE	0x4000000
+#define C_IS_TLS	0x8000000
 
 #define C_PERMANENT (C_IPV6 | C_RAWMSG)
 /* for connection status */
@@ -194,6 +195,24 @@ struct conn_target_info {
   int global_refcnt;
 };
 
+struct pseudo_conn_target_info {
+  struct event_timer timer;
+  int pad1;
+  int pad2;
+
+  void *pad3;
+  conn_type_t *type;
+  void *extra;
+  struct in_addr target;
+  unsigned char target_ipv6[16];
+  int port;
+  int active_outbound_connections, outbound_connections;
+  int ready_outbound_connections;
+
+  connection_job_t in_conn;
+  connection_job_t out_conn;
+};
+
 struct connection_info {
   struct event_timer timer;
   int fd;
@@ -232,6 +251,7 @@ struct connection_info {
   void *crypto_temp;
   int listening, listening_generation;
   int window_clamp;
+  int left_tls_packet_length;
 
   struct raw_message in_u, in, out, out_p;
 
@@ -427,4 +447,4 @@ extern unsigned nat_info[MAX_NAT_INFO_RULES][2];
 int net_add_nat_info (char *str);
 unsigned nat_translate_ip (unsigned local_ip);
 
-connection_job_t alloc_new_connection (int cfd, conn_target_job_t SS, connection_job_t LL, unsigned peer, unsigned char peer_ipv6[16], int peer_port);
+connection_job_t alloc_new_connection (int cfd, conn_target_job_t CTJ, listening_connection_job_t LCJ, int basic_type, conn_type_t *conn_type, void *conn_extra, unsigned peer, unsigned char peer_ipv6[16], int peer_port);

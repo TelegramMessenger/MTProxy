@@ -107,11 +107,11 @@ const char FullVersionStr[] = VERSION_STR " compiled at " __DATE__ " " __TIME__ 
 #define MAX_MTFRONT_NB			((NB_max * 3) >> 2)
 #endif
 
-double ping_interval = PING_INTERVAL;
-int window_clamp = DEFAULT_WINDOW_CLAMP;
+static double ping_interval = PING_INTERVAL;
+static int window_clamp;
 
 #define	PROXY_MODE_OUT	2
-int proxy_mode;
+static int proxy_mode;
 
 #define IS_PROXY_IN	0
 #define IS_PROXY_OUT	1
@@ -2076,23 +2076,32 @@ void cron (void) {
 int sfd;
 int http_ports_num;
 int http_sfd[MAX_HTTP_LISTEN_PORTS], http_port[MAX_HTTP_LISTEN_PORTS];
+static int domain_count;
+static int secret_count;
 
 // static double next_create_outbound;
 // int outbound_connections_per_second = DEFAULT_OUTBOUND_CONNECTION_CREATION_RATE;
 
 void mtfront_pre_loop (void) {
   int i, enable_ipv6 = engine_check_ipv6_enabled () ? SM_IPV6 : 0;
-  tcp_maximize_buffers = 1;
+  if (domain_count == 0) {
+    tcp_maximize_buffers = 1;
+    if (window_clamp == 0) {
+      window_clamp = DEFAULT_WINDOW_CLAMP;
+    }
+  }
   if (!workers) {
     for (i = 0; i < http_ports_num; i++) {
-      init_listening_tcpv6_connection (http_sfd[i], &ct_tcp_rpc_ext_server_mtfront, &ext_rpc_methods, enable_ipv6 | SM_LOWPRIO | SM_NOQACK | (max_special_connections ? SM_SPECIAL : 0));
-      //     assert (setsockopt (http_sfd[i], IPPROTO_TCP, TCP_MAXSEG, (int[]){1410}, sizeof (int)) >= 0);
-      //     assert (setsockopt (http_sfd[i], IPPROTO_TCP, TCP_NODELAY, (int[]){1}, sizeof (int)) >= 0);
-      listening_connection_job_t LC = Events[http_sfd[i]].data;
-      assert (LC);
-      CONN_INFO(LC)->window_clamp = window_clamp;
-      if (setsockopt (http_sfd[i], IPPROTO_TCP, TCP_WINDOW_CLAMP, &window_clamp, 4) < 0) {
-	vkprintf (0, "error while setting window size for socket %d to %d: %m\n", http_sfd[i], window_clamp);
+      init_listening_tcpv6_connection (http_sfd[i], &ct_tcp_rpc_ext_server_mtfront, &ext_rpc_methods, enable_ipv6 | SM_LOWPRIO | (domain_count == 0 ? SM_NOQACK : 0) | (max_special_connections ? SM_SPECIAL : 0));
+      // assert (setsockopt (http_sfd[i], IPPROTO_TCP, TCP_MAXSEG, (int[]){1410}, sizeof (int)) >= 0);
+      // assert (setsockopt (http_sfd[i], IPPROTO_TCP, TCP_NODELAY, (int[]){1}, sizeof (int)) >= 0);
+      if (window_clamp) {
+        listening_connection_job_t LC = Events[http_sfd[i]].data;
+        assert (LC);
+        CONN_INFO(LC)->window_clamp = window_clamp;
+        if (setsockopt (http_sfd[i], IPPROTO_TCP, TCP_WINDOW_CLAMP, &window_clamp, 4) < 0) {
+          vkprintf (0, "error while setting window size for socket #%d to %d: %m\n", http_sfd[i], window_clamp);
+        }
       }
     }
     // create_all_outbound_connections ();
@@ -2180,6 +2189,10 @@ int f_parse_option (int val) {
     engine_set_http_fallback (&ct_http_server, &http_methods_stats);
     mtproto_front_functions.flags &= ~ENGINE_NO_PORT;
     break;
+  case 'D':
+    tcp_rpc_add_proxy_domain (optarg);
+    domain_count++;
+    break;
   case 'S':
   case 'P':
     {
@@ -2209,6 +2222,7 @@ int f_parse_option (int val) {
       }
       if (val == 'S') {
 	tcp_rpcs_set_ext_secret (secret);
+	secret_count++;
       } else {
 	memcpy (proxy_tag, secret, sizeof (proxy_tag));
 	proxy_tag_set = 1;
@@ -2225,11 +2239,12 @@ void mtfront_prepare_parse_options (void) {
   parse_option ("http-stats", no_argument, 0, 2000, "allow http server to answer on stats queries");
   parse_option ("mtproto-secret", required_argument, 0, 'S', "16-byte secret in hex mode");
   parse_option ("proxy-tag", required_argument, 0, 'P', "16-byte proxy tag in hex mode to be passed along with all forwarded queries");
+  parse_option ("domain", required_argument, 0, 'D', "adds allowed domain for TLS-transport mode, disables other transports; can be specified more than once");
   parse_option ("max-special-connections", required_argument, 0, 'C', "sets maximal number of accepted client connections per worker");
   parse_option ("window-clamp", required_argument, 0, 'W', "sets window clamp for client TCP connections");
   parse_option ("http-ports", required_argument, 0, 'H', "comma-separated list of client (HTTP) ports to listen");
   // parse_option ("outbound-connections-ps", required_argument, 0, 'o', "limits creation rate of outbound connections to mtproto-servers (default %d)", DEFAULT_OUTBOUND_CONNECTION_CREATION_RATE);
-  parse_option ("slaves", required_argument, 0, 'M', "spawn several slave workers");
+  parse_option ("slaves", required_argument, 0, 'M', "spawn several slave workers; not recommended for TLS-transport mode for better replay protection");
   parse_option ("ping-interval", required_argument, 0, 'T', "sets ping interval in second for local TCP connections (default %.3lf)", PING_INTERVAL);
 }
 
@@ -2255,12 +2270,24 @@ void mtfront_pre_init (void) {
 
   vkprintf (1, "config loaded!\n");
 
+  if (domain_count) {
+    tcp_rpc_init_proxy_domains();
+
+    if (workers) {
+      kprintf ("It is recommended to not use workers with TLS-transport");
+    }
+    if (secret_count == 0) {
+      kprintf ("You must specify at least one mtproto-secret to use when using TLS-transport");
+      exit (2);
+    }
+  }
+
   int i, enable_ipv6 = engine_check_ipv6_enabled () ? SM_IPV6 : 0;
 
   for (i = 0; i < http_ports_num; i++) {
     http_sfd[i] = server_socket (http_port[i], engine_state->settings_addr, engine_get_backlog (), enable_ipv6);
     if (http_sfd[i] < 0) {
-      fprintf (stderr, "cannot open http/tcp server socket at port %d: %m\n", http_port[i]);
+      kprintf ("cannot open http/tcp server socket at port %d: %m\n", http_port[i]);
       exit (1);
     }
   }

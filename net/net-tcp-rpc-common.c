@@ -180,6 +180,11 @@ int tcp_rpc_write_packet_compact (connection_job_t C, struct raw_message *raw) {
     rwm_union (&CONN_INFO(C)->out, raw);
     return 0;
   }
+  if ((CONN_INFO (C)->flags & C_IS_TLS) && CONN_INFO (C)->left_tls_packet_length == -1) {
+    // uninited TLS connection
+    rwm_union (&CONN_INFO(C)->out, raw);
+    return 0;
+  }
     
   if (!(TCP_RPC_DATA(C)->flags & (RPC_F_COMPACT | RPC_F_MEDIUM))) {
     return tcp_rpc_write_packet (C, raw);

@@ -145,9 +145,7 @@ int rwm_process_from_offset (struct raw_message *raw, int bytes, int offset, int
 int rwm_transform_from_offset (struct raw_message *raw, int bytes, int offset, int (*transform_block)(void *extra, void *data, int len), void *extra);
 int rwm_process_and_advance (struct raw_message *raw, int bytes, int (*process_block)(void *extra, const void *data, int len), void *extra);
 int rwm_sha1 (struct raw_message *raw, int bytes, unsigned char output[20]);
-// int rwm_encrypt_decrypt (struct raw_message *raw, int bytes, tg_aes_ctx_t *ctx, unsigned char iv[32]);
-// int rwm_encrypt_decrypt_cbc (struct raw_message *raw, int bytes, tg_aes_ctx_t *ctx, unsigned char iv[16]);
-int rwm_encrypt_decrypt_to (struct raw_message *raw, struct raw_message *res, int bytes, tg_aes_ctx_t *ctx, void (*crypt)(tg_aes_ctx_t *ctx, const void *src, void *dst, int l, unsigned char *iv, void *extra, void *extra2), unsigned char *iv, int block_size, void *extra, void *extra2);
+int rwm_encrypt_decrypt_to (struct raw_message *raw, struct raw_message *res, int bytes, EVP_CIPHER_CTX *evp_ctx, int block_size);
 
 void *rwm_get_block_ptr (struct raw_message *raw);
 int rwm_get_block_ptr_bytes (struct raw_message *raw);

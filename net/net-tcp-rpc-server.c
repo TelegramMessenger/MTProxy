@@ -547,9 +547,6 @@ int tcp_rpcs_init_fake_crypto (connection_job_t c) {
   return 1;
 }
 
-#include "net/net-crypto-aes.h"
-#include "net/net-config.h"
-
 int tcp_rpcs_default_check_perm (connection_job_t C) {
   return RPCF_ALLOW_ENC | RPCF_REQ_DH | tcp_get_default_rpc_flags();
 }

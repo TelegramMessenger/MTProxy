@@ -70,12 +70,8 @@ struct aes_key_data {
 
 /* for c->crypto */
 struct aes_crypto {
-  unsigned char read_iv[16], write_iv[16];
-  unsigned char read_ebuf[16], write_ebuf[16]; /* for AES-CTR modes */ 
-  tg_aes_ctx_t read_aeskey __attribute__ ((aligned (16)));
-  tg_aes_ctx_t write_aeskey __attribute__ ((aligned (16)));
-  unsigned int read_num, write_num; /* for AES-CTR modes */
-  // long long read_pos, write_pos; /* for AES-CTR modes */
+  EVP_CIPHER_CTX *read_aeskey;
+  EVP_CIPHER_CTX *write_aeskey;
 };
 
 extern int aes_initialized;
