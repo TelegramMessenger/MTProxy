@@ -82,8 +82,8 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/MTProxy
-ExecStart=/opt/MTProxy/mtproto-proxy -u nobody -p 8888 -H 443 -S <secret> -P <proxy tag> <other params>
+WorkingDirectory=/opt/MTProxy/objs/bin
+ExecStart=/opt/MTProxy/objs/bin/mtproto-proxy -u nobody -p 8888 -H 443 -S <secret> -P <proxy tag> <other params>
 Restart=on-failure
 
 [Install]
