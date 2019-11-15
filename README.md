@@ -104,6 +104,9 @@ systemctl status MTProxy.service
 systemctl enable MTProxy.service
 ```
 
+## For NAT users (conntrack issue)
+If your server is behind NAT and your interface / IP address is not public and you have private range, you might be seeing lots of and probably unlimited logs with `-v` option or might get bunch of errors in your `dmesg` command saying that your conntrack is full. In this case try using the `--nat-info <local-addr>:<global-addr>` argument to eliminate this issue.
+
 ## Docker image
 Telegram is also providing [official Docker image](https://hub.docker.com/r/telegrammessenger/proxy/).
 Note: the image is outdated.
