@@ -36,7 +36,7 @@ yum groupinstall <span class="pl-s"><span class="pl-pds">"</span>Development Too
 
 همچنین شما میتوانید از دستور <code>mtproto-proxy --help</code> برای دیدن دیگر گذینه ها استفاده کنید
 
-<li>لینک را طبق این الگو بسازید: <code>tg://proxy?server=دامنه یا ایپی سرور&port=پورت&secret=سکرت</code></li>
+<li>لینک را طبق این الگو بسازید: <code dir="ltr">tg://proxy?server=دامنه یا ایپی سرور&port=پورت&secret=سکرت</code></li>
 <li>پروکسی خود را توسط ربات @MtProxybot ثبت کنید</li>
 <li>تگ دریافت شده را با این سویچ تنظیم کنید: <code>-P تگ</code></li>
 
