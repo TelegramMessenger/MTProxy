@@ -34,11 +34,11 @@ yum groupinstall <span class="pl-s"><span class="pl-pds">"</span>Development Too
 <li><code>proxy-secret</code> و <code>proxy-multi.conf</code> در مراحل اول و دوم دریافت شدند</li>
 <li><code>1</code> تعداد کارگران است. اگر شما یک سرور قدرت مند دارید میتوانید تعداد کارگران را افزایش دهید</li>
 
-همچنین شما میتوانید از دستور <code>mtproto-proxy --help</code> برای دیدن دیگر گذینه ها استفاده کنید
+همچنین شما میتوانید از دستور <code dir="ltr">mtproto-proxy --help</code> برای دیدن دیگر گذینه ها استفاده کنید
 
 <li>لینک را طبق این الگو بسازید: <code dir="ltr">tg://proxy?server=دامنه یا ایپی سرور&port=پورت&secret=سکرت</code></li>
-<li>پروکسی خود را توسط ربات @MtProxybot ثبت کنید</li>
-<li>تگ دریافت شده را با این سویچ تنظیم کنید: <code>-P تگ</code></li>
+<li>پروکسی خود را توسط ربات <code dir="ltr">@MtProxybot</code> ثبت کنید</li>
+<li>تگ دریافت شده را با این سویچ تنظیم کنید: <code dir="ltr">-P تگ</code></li>
 
 <h2>پد تصادفی</h2>
 برخی از سرویس دهنده ها پروکسی هارا از طریق اندازه بسته ها پیدا میکنند، اگر چنین حالتی فعال باشد پد تصادفی به بسته ها اضافه میشود
