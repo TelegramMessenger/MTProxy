@@ -18,11 +18,14 @@ yum groupinstall <span class="pl-s"><span class="pl-pds">"</span>Development Too
 
 <h2>راه اندازی</h2>
 <li>دریافت یک سکرت، مورد استفاده برای اتصال به سرور تلگرام</li>
-<div class="highlight highlight-source-shell"><pre>curl -s https://core.telegram.org/getProxySecret -o proxy-secret</pre></div>
+<div dir="ltr" class="highlight highlight-source-shell"><pre>curl -s https://core.telegram.org/getProxySecret -o proxy-secret</pre></div>
 <li>دریافت تنظیمات فعلی تلگرام. (این تنظیمات ممکن است تغییر کنند، بنابراین بهتر است یک بار در روز بروزرسانی کنید)</li>
-<div class="highlight highlight-source-shell"><pre>curl -s https://core.telegram.org/getProxyConfig -o proxy-multi.conf</pre></div>
+<div dir="ltr" class="highlight highlight-source-shell"><pre>curl -s https://core.telegram.org/getProxyConfig -o proxy-multi.conf</pre></div>
 <li>ساخت یک سکرت، مورد استفاده برای اتصال کاربران به پروکسی شما</li>
-<div class="highlight highlight-source-shell"><pre>head -c 16 /dev/urandom <span class="pl-k">|</span> xxd -ps</pre></div>
+<div dir="ltr" class="highlight highlight-source-shell"><pre>head -c 16 /dev/urandom <span class="pl-k">|</span> xxd -ps</pre></div>
 <li>اجرای پروکسی</li>
-<div class="highlight highlight-source-shell"><pre>./mtproto-proxy -u nobody -p 8888 -H 443 -S <span class="pl-k">&lt;</span>secret<span class="pl-k">&gt;</span> --aes-pwd proxy-secret proxy-multi.conf -M 1</pre></div>
+<div dir="ltr" class="highlight highlight-source-shell"><pre>./mtproto-proxy -u nobody -p 8888 -H 443 -S <span class="pl-k">&lt;</span>secret<span class="pl-k">&gt;</span> --aes-pwd proxy-secret proxy-multi.conf -M 1</pre></div>
+<li>nobody نام کاربری است، mt-proxy با استفاده از stupid امتیازات و وابستگی های آن را پاک میکند</li>
+<li>8888 پورت داخلی شما است، شما میتوانید از آن برای دریافت اطلاعات پروکسی استفاده  کنید، مانند <code>wget localhost:8888/stats</code></li>
+<li>433 پورتی است که کابران از طریق آن به پروکسی شما وصل میشوند</li>
 </div>
