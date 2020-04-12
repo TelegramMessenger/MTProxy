@@ -25,3 +25,4 @@ yum groupinstall <span class="pl-s"><span class="pl-pds">"</span>Development Too
 <div class="highlight highlight-source-shell"><pre>head -c 16 /dev/urandom <span class="pl-k">|</span> xxd -ps</pre></div>
 <li>اجرای پروکسی</li>
 <div class="highlight highlight-source-shell"><pre>./mtproto-proxy -u nobody -p 8888 -H 443 -S <span class="pl-k">&lt;</span>secret<span class="pl-k">&gt;</span> --aes-pwd proxy-secret proxy-multi.conf -M 1</pre></div>
+</div>
