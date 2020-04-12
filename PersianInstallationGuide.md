@@ -30,7 +30,7 @@ yum groupinstall <span class="pl-s"><span class="pl-pds">"</span>Development Too
 <li><code>nobody</code> نام کاربری است، mt-proxy با استفاده از stupid امتیازات و وابستگی های آن را پاک میکند</li>
 <li><code>8888</code> پورت داخلی شما است، شما میتوانید از آن برای دریافت اطلاعات پروکسی استفاده  کنید، مانند <code>wget localhost:8888/stats</code></li>
 <li><code>433</code> پورتی است که کابران از طریق آن به پروکسی شما وصل میشوند</li>
-<li><code>secret</code> همان سکرتی است که در مرحله سه ساخته اید، شما همچنین میتوانید از چند سکرت استفاده کنید: <code>-S سکرت اول -S سکرت دوم</code></li>
+<li><code>secret</code> همان سکرتی است که در مرحله سه ساخته اید، شما همچنین میتوانید از چند سکرت استفاده کنید: <code dir="ltr">-S سکرت اول -S سکرت دوم</code></li>
 <li><code>proxy-secret</code> و <code>proxy-multi.conf</code> در مراحل اول و دوم دریافت شدند</li>
 <li><code>1</code> تعداد کارگران است. اگر شما یک سرور قدرت مند دارید میتوانید تعداد کارگران را افزایش دهید</li>
 
