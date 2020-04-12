@@ -26,7 +26,7 @@ yum groupinstall <span class="pl-s"><span class="pl-pds">"</span>Development Too
 <li>اجرای پروکسی</li>
 <div dir="ltr" class="highlight highlight-source-shell"><pre>./mtproto-proxy -u nobody -p 8888 -H 443 -S <span class="pl-k">&lt;</span>secret<span class="pl-k">&gt;</span> --aes-pwd proxy-secret proxy-multi.conf -M 1</pre></div>
 
-راهنم:
+راهنما:
 <li><code>nobody</code> نام کاربری است، mt-proxy با استفاده از stupid امتیازات و وابستگی های آن را پاک میکند</li>
 <li><code>8888</code> پورت داخلی شما است، شما میتوانید از آن برای دریافت اطلاعات پروکسی استفاده  کنید، مانند <code>wget localhost:8888/stats</code></li>
 <li><code>433</code> پورتی است که کابران از طریق آن به پروکسی شما وصل میشوند</li>
@@ -34,7 +34,7 @@ yum groupinstall <span class="pl-s"><span class="pl-pds">"</span>Development Too
 <li><code>proxy-secret</code> و <code>proxy-multi.conf</code> در مراحل اول و دوم دریافت شدند</li>
 <li><code>1</code> تعداد کارگران است. اگر شما یک سرور قدرت مند دارید میتوانید تعداد کارگران را افزایش دهید</li>
 
-همچنین شما میتوانید از دستور <code dir="ltr">mtproto-proxy --help</code> برای دیدن دیگر گذینه ها استفاده کنید
+همچنین شما میتوانید از دستور <code dir="ltr">mtproto-proxy --help</code> .برای دیدن دیگر گزینه ها استفاده کنید
 
 <li>لینک را طبق این الگو بسازید: <code dir="ltr">tg://proxy?server=دامنه یا ایپی سرور&port=پورت&secret=سکرت</code></li>
 <li>پروکسی خود را توسط ربات <code dir="ltr">@MtProxybot</code> ثبت کنید</li>
