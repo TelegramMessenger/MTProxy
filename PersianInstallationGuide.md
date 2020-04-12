@@ -12,7 +12,7 @@
 
 <div dir="ltr" class="highlight highlight-source-shell"><pre>yum install openssl-devel zlib-devel
 yum groupinstall <span class="pl-s"><span class="pl-pds">"</span>Development Tools<span class="pl-pds">"</span></span></pre></div>
-<li>:کلون کردن مخزن:</li>
+<li>کلون کردن مخزن:</li>
 
 <div dir="ltr" class="highlight highlight-source-shell"><pre>git clone https://github.com/TelegramMessenger/MTProxy
 <span class="pl-c1">cd</span> MTProxy</pre></div>
