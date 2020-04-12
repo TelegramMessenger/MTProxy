@@ -107,3 +107,7 @@ systemctl enable MTProxy.service
 ## Docker image
 Telegram is also providing [official Docker image](https://hub.docker.com/r/telegrammessenger/proxy/).
 Note: the image is outdated.
+<div dir="rtl">
+<h1>ترجمه به فارسی</h1>
+<a href=/PersianInstallationGuide.md>برای مشاهده کلیک کنید</a>
+</div>
