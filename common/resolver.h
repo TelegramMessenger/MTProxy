@@ -27,7 +27,7 @@
 extern "C" {
 #endif
 
-int kdb_hosts_loaded;
+extern int kdb_hosts_loaded;
 int kdb_load_hosts (void);
 
 struct hostent *kdb_gethostbyname (const char *name);
