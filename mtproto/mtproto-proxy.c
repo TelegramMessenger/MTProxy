@@ -409,7 +409,7 @@ int worker_id, workers, slave_mode, parent_pid;
 int pids[MAX_WORKERS];
 
 long long get_queries;
-long long http_queries;
+extern long long http_queries;
 int pending_http_queries;
 
 long long active_rpcs, active_rpcs_created;

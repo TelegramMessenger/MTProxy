@@ -52,7 +52,7 @@
 
 #include "engine/engine.h"
 
-struct process_id PID;
+extern struct process_id PID;
 
 extern int zheap_debug;
 long long queries_allocated;

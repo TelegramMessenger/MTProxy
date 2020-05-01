@@ -21,7 +21,7 @@
 
 #include <assert.h>
       
-long long total_vv_tree_nodes;
+extern long long total_vv_tree_nodes;
 
 #define SUFFIX2(a,b) a ## b
 #define SUFFIX(a,b) SUFFIX2(a,b)
