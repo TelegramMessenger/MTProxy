@@ -33,7 +33,7 @@ If the build has failed, you should run `make clean` before building it again.
 ```bash
 curl -s https://core.telegram.org/getProxySecret -o proxy-secret
 ```
-2. Obtain current telegram configuration. It can change (occasionally), so we encourage you to update it once per day.
+2. Obtain current telegram configuration. It can change (occasionally), so we encourage you to update it once per day (see [below](#Timers) ).
 ```bash
 curl -s https://core.telegram.org/getProxyConfig -o proxy-multi.conf
 ```
@@ -102,6 +102,53 @@ systemctl status MTProxy.service
 5. Enable it, to autostart service after reboot:
 ```bash
 systemctl enable MTProxy.service
+```
+
+### Timers
+
+This provides automatic proxy-multi.conf file update everyday
+
+1. Create and edit systemd service file (especially path of proxy-multi.conf file):
+```bash
+nano /etc/systemd/system/MTProxy-multiUpdater.service
+```
+
+```bash
+[Unit]
+Description=Update MTPRoxy proxy-multi.conf file
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/curl -s https://core.telegram.org/getProxyConfig -o /opt/MTProxy/proxy-multi.conf
+```
+2. Add the timer (this example runs above service everyday at 4AM)
+```bash
+nano /etc/systemd/system/MTProxy-multiUpdater.timer
+```
+
+```bash
+[Unit]
+Description=MTProxy-multiUpdater timer
+
+[Timer]
+OnCalendar=*-*-* 4:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+3. Reload daemons:
+```bash
+systemctl daemon-reload
+```
+4. Enable and start timer
+```bash
+systemctl enable MTProxy-multiUpdater.timer
+systemctl start MTProxy-multiUpdater.timer
+```
+5. Check timer is properly set up
+```bash
+systemctl list-timers
 ```
 
 ## Docker image
