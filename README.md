@@ -123,7 +123,7 @@ ExecStart=/usr/bin/curl -s https://core.telegram.org/getProxyConfig -o /opt/MTPr
 ```
 2. Add the timer (this example runs above service everyday at 4AM)
 ```bash
-nano /etc/systemd/system/MTProxy-multiUpdater.service
+nano /etc/systemd/system/MTProxy-multiUpdater.timer
 ```
 
 ```bash
@@ -141,9 +141,10 @@ WantedBy=timers.target
 ```bash
 systemctl daemon-reload
 ```
-4. Enable timer
+4. Enable and start timer
 ```bash
 systemctl enable MTProxy-multiUpdater.timer
+systemctl start MTProxy-multiUpdater.timer
 ```
 5. Check timer is properly set up
 ```bash
