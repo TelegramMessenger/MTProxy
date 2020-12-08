@@ -370,9 +370,7 @@ __thread job_t this_job;
 
 long int lrand48_j (void) {
   if (this_job_thread) {
-    long int t;
-    lrand48_r (&this_job_thread->rand_data, &t);
-    return t;
+    return nrand48 (this_job_thread->rand_data);
   } else {
     return lrand48 ();
   }
@@ -380,9 +378,7 @@ long int lrand48_j (void) {
 
 long int mrand48_j (void) {
   if (this_job_thread) {
-    long int t;
-    mrand48_r (&this_job_thread->rand_data, &t);
-    return t;
+    return jrand48 (this_job_thread->rand_data);
   } else {
     return mrand48 ();
   }
@@ -390,9 +386,7 @@ long int mrand48_j (void) {
 
 double drand48_j (void) {
   if (this_job_thread) {
-    double t;
-    drand48_r (&this_job_thread->rand_data, &t);
-    return t;
+    return erand48 (this_job_thread->rand_data);
   } else {
     return drand48 ();
   }
@@ -463,8 +457,10 @@ int create_job_thread_ex (int thread_class, void *(*thread_work)(void *)) {
   JT->id = i;
   assert (JT->job_queue);
 
-  srand48_r (rdtsc () ^ lrand48 (), &JT->rand_data);
-
+  long int seed = rdtsc () ^ lrand48 ();
+  JT->rand_data[0] = 0x330e;
+  JT->rand_data[1] = seed;
+  JT->rand_data[2] = seed >> 16;
 
   if (thread_class != JC_MAIN) {
     pthread_attr_t attr;

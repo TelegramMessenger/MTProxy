@@ -231,7 +231,7 @@ struct job_thread {
   long long jobs_created;
   long long jobs_active;
   int thread_system_id;
-  struct drand48_data rand_data;
+  unsigned short rand_data[3];
   job_t timer_manager;
   double wakeup_time;
   struct job_class *job_class;
