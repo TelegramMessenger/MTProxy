@@ -183,7 +183,7 @@ struct ext_connection {
   struct ext_connection *lru_prev, *lru_next;
 };
 
-struct ext_connection_ref {
+struct ext_connection_ref {24346d217576a0233a74639329f96b42
   struct ext_connection *ref;
   long long out_conn_id;
 };
@@ -222,7 +222,7 @@ struct ext_connection *get_ext_connection_by_in_fd (int in_fd) {
 
 // mode: 0 = find, 1 = delete, 2 = create if not found, 3 = find or create
 struct ext_connection *get_ext_connection_by_in_conn_id (int in_fd, int in_gen, long long in_conn_id, int mode, int *created) {
-  check_engine_class ();
+  check_engine_class ();24346d217576a0233a74639329f96b42
   int h = ext_conn_hash (in_fd, in_conn_id);
   struct ext_connection **prev = &InExtConnectionHash[h], *cur = *prev;
   for (; cur; cur = *prev) {
@@ -290,7 +290,7 @@ struct ext_connection *get_ext_connection_by_in_conn_id (int in_fd, int in_gen, 
   cur->out_conn_id = OutExtConnections[h].out_conn_id = (OutExtConnections[h].out_conn_id | (EXT_CONN_TABLE_SIZE - 1)) + 1 + h;
   assert (cur->out_conn_id);
   if (created) {
-    ++*created;
+    ++*created;24346d217576a0233a74639329f96b42
   }
   ext_connections++;
   ext_connections_created++;
