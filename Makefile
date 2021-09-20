@@ -13,7 +13,11 @@ ARCH = -m64
 endif
 
 CFLAGS = $(ARCH) -O3 -std=gnu11 -Wall -mpclmul -march=core2 -mfpmath=sse -mssse3 -fcommon -fno-strict-aliasing -fno-strict-overflow -fwrapv -DAES=1 -DCOMMIT=\"${COMMIT}\" -D_GNU_SOURCE=1 -D_FILE_OFFSET_BITS=64
-LDFLAGS = $(ARCH) -ggdb -rdynamic -lm -lrt -lcrypto -lz -lpthread -lcrypto
+LDFLAGS = $(ARCH) -ggdb -rdynamic -lm -lrt -lz -lpthread -lcrypto
+LIBEXECTEST = '\#include <execinfo.h>\nint main(){return backtrace(0,0);}'
+ifeq ($(shell printf ${LIBEXECTEST} | gcc -x c -o /dev/null - -lexecinfo 2>/dev/null; echo $$?), 0)
+LDFLAGS := ${LDFLAGS} -lexecinfo # For systems without glibc e.g. Alpine linux that uses musl libc.
+endif
 
 LIB = ${OBJ}/lib
 CINCLUDE = -iquote common -iquote .
