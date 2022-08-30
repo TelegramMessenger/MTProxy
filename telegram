@@ -1,0 +1,4 @@
+yum install wget -y
+wget https://raw.githubusercontent.com/TyrantJoy/One-click-shell_script/master/MTProxy/MTProxy.sh
+chmod +x MTProxy.sh
+./MTProxy.sh
