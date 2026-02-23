@@ -30,7 +30,12 @@
 
 // GLIBC DEFINES RTMAX as function
 // engine_init () asserts, that OUT_SIGRTMAX == SIGRTMAX
+// FreeBSD has SIGRTMAX=126 which doesn't fit in 64-bit signal mask, so use a lower value
+#ifdef __FreeBSD__
+#define OUR_SIGRTMAX 63
+#else
 #define OUR_SIGRTMAX 64
+#endif
 
 #include "common/common-stats.h"
 #include "engine/engine-rpc.h"

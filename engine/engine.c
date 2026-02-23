@@ -310,7 +310,9 @@ void server_init (conn_type_t *listen_connection_type, void *listen_connection_e
   ksignal (SIGINT,  sigint_handler);
   ksignal (SIGTERM, sigterm_handler);
   ksignal (SIGPIPE, empty_signal_handler);
+#ifdef SIGPOLL
   ksignal (SIGPOLL, empty_signal_handler);
+#endif
 
   if (daemonize) {
     ksignal (SIGHUP, default_signal_handler);
@@ -534,11 +536,19 @@ static void check_server_functions (void) /* {{{ */ {
 
   check_signal_handler (F, SIGHUP, default_sighup);
   check_signal_handler (F, SIGUSR1, default_sigusr1);
+#ifndef __FreeBSD__
   check_signal_handler (F, SIGRTMAX-9, default_sigrtmax_9);
   check_signal_handler (F, SIGRTMAX-8, default_sigrtmax_8);
   check_signal_handler (F, SIGRTMAX-4, default_sigrtmax_4);
   check_signal_handler (F, SIGRTMAX-1, default_sigrtmax_1);
   check_signal_handler (F, SIGRTMAX, default_sigrtmax);
+#else
+  check_signal_handler (F, OUR_SIGRTMAX-9, default_sigrtmax_9);
+  check_signal_handler (F, OUR_SIGRTMAX-8, default_sigrtmax_8);
+  check_signal_handler (F, OUR_SIGRTMAX-4, default_sigrtmax_4);
+  check_signal_handler (F, OUR_SIGRTMAX-1, default_sigrtmax_1);
+  check_signal_handler (F, OUR_SIGRTMAX, default_sigrtmax);
+#endif
 
   if (!F->close_net_sockets) { F->close_net_sockets = default_close_network_sockets; }
   if (!F->cron) { F->cron = default_cron; }
@@ -573,8 +583,10 @@ void engine_startup (engine_t *E, server_functions_t *F) /* {{{ */ {
 
   precise_now_diff = get_utime_monotonic () - get_double_time ();
 
+#ifndef __FreeBSD__
   assert (SIGRTMAX == OUR_SIGRTMAX);
   assert (SIGRTMAX - SIGRTMIN >= 20);
+#endif
   
   E->sfd = 0;
   E->epoll_wait_timeout = DEFAULT_EPOLL_WAIT_TIMEOUT;
