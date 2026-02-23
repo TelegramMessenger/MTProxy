@@ -20,7 +20,9 @@
 */
 
 #define	_FILE_OFFSET_BITS        64
+#ifndef __FreeBSD__
 #define _XOPEN_SOURCE 500
+#endif
 #define _GNU_SOURCE 1
 
 #include <assert.h>
@@ -33,10 +35,22 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <math.h>
+#ifdef __linux__
 #include <malloc.h>
 #include <sys/syscall.h>
-#include <math.h>
 #include <linux/futex.h>
+#endif
+#ifdef __FreeBSD__
+#include <stdlib.h>
+#include <pthread.h>
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#include <sys/thr.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+static pthread_mutex_t drand48_mutex = PTHREAD_MUTEX_INITIALIZER;
+#endif
 
 #include "common/proc-stat.h"
 #include "crc32.h"
@@ -369,6 +383,7 @@ __thread struct job_thread *this_job_thread;
 __thread job_t this_job;
 
 long int lrand48_j (void) {
+#ifdef __linux__
   if (this_job_thread) {
     long int t;
     lrand48_r (&this_job_thread->rand_data, &t);
@@ -376,9 +391,17 @@ long int lrand48_j (void) {
   } else {
     return lrand48 ();
   }
+#else
+  long int t;
+  pthread_mutex_lock (&drand48_mutex);
+  t = lrand48 ();
+  pthread_mutex_unlock (&drand48_mutex);
+  return t;
+#endif
 }
 
 long int mrand48_j (void) {
+#ifdef __linux__
   if (this_job_thread) {
     long int t;
     mrand48_r (&this_job_thread->rand_data, &t);
@@ -386,9 +409,17 @@ long int mrand48_j (void) {
   } else {
     return mrand48 ();
   }
+#else
+  long int t;
+  pthread_mutex_lock (&drand48_mutex);
+  t = mrand48 ();
+  pthread_mutex_unlock (&drand48_mutex);
+  return t;
+#endif
 }
 
 double drand48_j (void) {
+#ifdef __linux__
   if (this_job_thread) {
     double t;
     drand48_r (&this_job_thread->rand_data, &t);
@@ -396,6 +427,13 @@ double drand48_j (void) {
   } else {
     return drand48 ();
   }
+#else
+  double t;
+  pthread_mutex_lock (&drand48_mutex);
+  t = drand48 ();
+  pthread_mutex_unlock (&drand48_mutex);
+  return t;
+#endif
 }
 
 struct mp_queue MainJobQueue __attribute__((aligned(128)));
@@ -463,7 +501,13 @@ int create_job_thread_ex (int thread_class, void *(*thread_work)(void *)) {
   JT->id = i;
   assert (JT->job_queue);
 
+#ifdef __linux__
   srand48_r (rdtsc () ^ lrand48 (), &JT->rand_data);
+#else
+  pthread_mutex_lock (&drand48_mutex);
+  srand48 (rdtsc () ^ lrand48 ());
+  pthread_mutex_unlock (&drand48_mutex);
+#endif
 
 
   if (thread_class != JC_MAIN) {
@@ -889,7 +933,15 @@ void *job_thread_ex (void *arg, void (*work_one)(void *, int)) {
   assert (!(JT->thread_class & ~JC_MASK));
 
   get_this_thread_id ();
+#ifdef __linux__
   JT->thread_system_id = syscall (SYS_gettid);
+#elif defined(__FreeBSD__)
+  long tid;
+  thr_self (&tid);
+  JT->thread_system_id = (int) tid;
+#else
+  JT->thread_system_id = (int) pthread_self ();
+#endif
 
   set_job_interrupt_signal_handler ();
 

@@ -36,7 +36,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/epoll.h>
+#ifdef __linux__
 #include <sys/io.h>
+#endif
 #include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
@@ -568,7 +570,9 @@ int server_socket (int port, struct in_addr in_addr, int backlog, int mode) {
   if (mode & SM_UDP) {
     maximize_sndbuf (socket_fd, 0);
     maximize_rcvbuf (socket_fd, 0);
+#ifdef IP_RECVERR
     setsockopt (socket_fd, SOL_IP, IP_RECVERR, &flags, sizeof (flags));
+#endif
   } else {
     setsockopt (socket_fd, SOL_SOCKET, SO_REUSEADDR, &flags, sizeof (flags));
     if (tcp_maximize_buffers) {
@@ -644,7 +648,9 @@ int client_socket (in_addr_t in_addr, int port, int mode) {
   if (mode & SM_UDP) {
     maximize_sndbuf (socket_fd, 0);
     maximize_rcvbuf (socket_fd, 0);
+#ifdef IP_RECVERR
     setsockopt (socket_fd, SOL_IP, IP_RECVERR, &flags, sizeof (flags));
+#endif
   } else {
     setsockopt (socket_fd, SOL_SOCKET, SO_REUSEADDR, &flags, sizeof (flags));
     if (tcp_maximize_buffers) {

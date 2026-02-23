@@ -26,6 +26,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <signal.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -2098,9 +2099,11 @@ void mtfront_pre_loop (void) {
         listening_connection_job_t LC = Events[http_sfd[i]].data;
         assert (LC);
         CONN_INFO(LC)->window_clamp = window_clamp;
+#ifdef TCP_WINDOW_CLAMP
         if (setsockopt (http_sfd[i], IPPROTO_TCP, TCP_WINDOW_CLAMP, &window_clamp, 4) < 0) {
           vkprintf (0, "error while setting window size for socket #%d to %d: %m\n", http_sfd[i], window_clamp);
         }
+#endif
       }
     }
     // create_all_outbound_connections ();

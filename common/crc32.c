@@ -31,6 +31,19 @@
 #include "common/cpuid.h"
 #include "common/kprintf.h"
 
+/* Compatibility for GCC intrinsics when using clang */
+#ifdef __clang__
+#include <emmintrin.h>
+#include <tmmintrin.h>
+#include <wmmintrin.h>
+
+#define __builtin_ia32_loaddqu(p) ((__m128i)_mm_loadu_si128((const __m128i *)(p)))
+#define __builtin_ia32_pshufb128(a, b) ((__m128i)_mm_shuffle_epi8((__m128i)(a), (__m128i)(b)))
+#define __builtin_ia32_pslldqi128(a, n) _mm_slli_si128((__m128i)(a), (n) / 8)
+#define __builtin_ia32_psrldqi128(a, n) _mm_srli_si128((__m128i)(a), (n) / 8)
+#define __builtin_ia32_punpckhqdq128(a, b) _mm_unpackhi_epi64((__m128i)(a), (__m128i)(b))
+#endif
+
 
 #define FASTMOV_RMI32_TO_SSE(dst, src) \
 	asm volatile ("movd %1, %0\n\t" : "=x" (dst) : "g" (src))

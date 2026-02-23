@@ -20,7 +20,9 @@
     
 */
 #define	_FILE_OFFSET_BITS	64
+#ifndef __FreeBSD__
 #define _XOPEN_SOURCE 500
+#endif
 
 
 #include <assert.h>

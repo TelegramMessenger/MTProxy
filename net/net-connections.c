@@ -46,6 +46,11 @@
 #include <time.h>
 #include <unistd.h>
 
+/* libepoll-shim on FreeBSD defines close as a macro, which conflicts with struct members named 'close' */
+#ifdef close
+#undef close
+#endif
+
 #include "crc32.h"
 #include "jobs/jobs.h"
 #include "net/net-events.h"
@@ -321,8 +326,12 @@ void connection_write_close (connection_job_t C) /* {{{ */ {
 
 /* qack {{{ */
 static inline void disable_qack (int fd) {
+#ifdef TCP_QUICKACK
   vkprintf (2, "disable TCP_QUICKACK for %d\n", fd);
   assert (setsockopt (fd, IPPROTO_TCP, TCP_QUICKACK, (int[]){0}, sizeof (int)) >= 0);
+#else
+  (void)fd;
+#endif
 }
 
 static inline void cond_disable_qack (socket_connection_job_t C) {
@@ -737,6 +746,7 @@ connection_job_t alloc_new_connection (int cfd, conn_target_job_t CTJ, listening
           }
         }
       }
+#ifdef TCP_WINDOW_CLAMP
       if (c->window_clamp) {
         if (setsockopt (cfd, IPPROTO_TCP, TCP_WINDOW_CLAMP, &c->window_clamp, 4) < 0) {
           vkprintf (0, "error while setting window size for socket #%d to %d: %m\n", cfd, c->window_clamp);
@@ -748,6 +758,7 @@ connection_job_t alloc_new_connection (int cfd, conn_target_job_t CTJ, listening
           vkprintf (2, "window clamp for socket #%d is %d, receive buffer is %d\n", cfd, t1, t2);
         }
       }
+#endif
     }
 
     alloc_new_socket_connection (C);

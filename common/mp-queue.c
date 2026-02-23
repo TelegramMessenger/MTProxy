@@ -32,8 +32,14 @@
 #include <time.h>
 #include <unistd.h>
 
+#ifdef __linux__
 #include <linux/futex.h>
 #include <sys/syscall.h>
+#endif
+#ifdef __FreeBSD__
+#include <sys/types.h>
+#include <sys/umtx.h>
+#endif
 
 #include "server-functions.h"
 #include "kprintf.h"
@@ -116,12 +122,16 @@ int get_this_thread_id (void) {
   return mpq_this_thread_id = i;
 }
 
-/* custom semaphore implementation using futexes */
+/* custom semaphore implementation using futexes (Linux) or umtx (FreeBSD) */
 
 int mp_sem_post (mp_sem_t *sem) {
   __sync_fetch_and_add (&sem->value, 1);
   if (sem->waiting > 0) {
+#ifdef __linux__
     syscall (__NR_futex, &sem->value, FUTEX_WAKE, 1, NULL, 0, 0);
+#elif defined(__FreeBSD__)
+    _umtx_op (&sem->value, UMTX_OP_WAKE, 1, NULL, NULL);
+#endif
   }
   return 0;
 }
@@ -142,7 +152,11 @@ int mp_sem_wait (mp_sem_t *sem) {
 	continue;
       }
       __sync_fetch_and_add (&sem->waiting, 1);
+#ifdef __linux__
       syscall (__NR_futex, &sem->value, FUTEX_WAIT, v, NULL, 0, 0);
+#elif defined(__FreeBSD__)
+      _umtx_op (&sem->value, UMTX_OP_WAIT_UINT, v, NULL, NULL);
+#endif
       __sync_fetch_and_add (&sem->waiting, -1);
       v = sem->value;
       q = 0;
