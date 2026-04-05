@@ -27,9 +27,10 @@ DEPDIRS := ${DEP} $(addprefix ${DEP}/,${PROJECTS})
 ALLDIRS := ${DEPDIRS} ${OBJDIRS}
 
 
-.PHONY:	all clean 
+.PHONY:	all clean test
 
 EXELIST	:= ${EXE}/mtproto-proxy
+TESTLIST := ${EXE}/test_pid
 
 
 OBJECTS	=	\
@@ -95,6 +96,13 @@ ${EXE}/mtproto-proxy:	${OBJ}/mtproto/mtproto-proxy.o ${OBJ}/mtproto/mtproto-conf
 
 ${LIB}/libkdb.a: ${LIB_OBJS}
 	rm -f $@ && ar rcs $@ $^
+
+${EXE}/test_pid: tests/test_pid.c ${OBJ}/common/pid.o | ${EXE}
+	${CC} ${CFLAGS} ${CINCLUDE} -o $@ $^
+
+test: ${TESTLIST}
+	@for t in ${TESTLIST}; do echo "--- Running $$t ---"; $$t || exit 1; done
+	@echo "All tests passed."
 
 clean:
 	rm -rf ${OBJ} ${DEP} ${EXE} || true

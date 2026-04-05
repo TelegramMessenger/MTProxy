@@ -29,14 +29,14 @@
 struct process_id {
   unsigned ip;
   short port;
-  unsigned short pid;
+  unsigned short pid;  /* XOR-folded from OS pid to fit wire protocol (16 bits) */
   int utime;
 };
 
 struct process_id_ext {
   unsigned ip;
   short port;
-  unsigned short pid;
+  unsigned short pid;  /* XOR-folded from OS pid to fit wire protocol (16 bits) */
   int utime;
   int actor_id;
 };

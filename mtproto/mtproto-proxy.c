@@ -2304,6 +2304,11 @@ void mtfront_pre_init (void) {
       int pid = fork ();
       assert (pid >= 0);
       if (!pid) {
+        npid_t old_PID = PID;
+        PID.pid = 0;
+        PID.utime = 0;
+        init_common_PID ();
+        assert (PID.pid != old_PID.pid || PID.utime != old_PID.utime);
         worker_id = i;
         workers = 0;
         slave_mode = 1;

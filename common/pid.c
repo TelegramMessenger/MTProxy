@@ -39,8 +39,8 @@ npid_t PID;
 void init_common_PID (void) {
   if (!PID.pid) {
     int p = getpid ();
-    assert (!(p & 0xffff0000));
-    PID.pid = p;
+    unsigned short folded = (unsigned short)((p & 0xffff) ^ (p >> 16));
+    PID.pid = folded ? folded : 1;
   }
   if (!PID.utime) {
     PID.utime = time (0);
