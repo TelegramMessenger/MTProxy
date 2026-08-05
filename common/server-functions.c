@@ -35,7 +35,9 @@
 #include <arpa/inet.h>
 #include <assert.h>
 #include <errno.h>
+#ifdef __GLIBC__
 #include <execinfo.h>
+#endif
 #include <fcntl.h>
 #include <getopt.h>
 #include <grp.h>
@@ -168,6 +170,7 @@ const char *get_version_string (void) {
 }
 
 void print_backtrace (void) {
+#ifdef __GLIBC__
   void *buffer[64];
   int nptrs = backtrace (buffer, 64);
   kwrite (2, "\n------- Stack Backtrace -------\n", 33);
@@ -178,6 +181,9 @@ void print_backtrace (void) {
     kwrite (2, s, strlen (s));
     kwrite (2, "\n", 1);
   }
+#else
+  kwrite(2, "--- Backtrace Only On Glibc ---\n", 32);
+#endif
 }
 
 pthread_t debug_main_pthread_id;

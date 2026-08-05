@@ -25,6 +25,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <semaphore.h>
+
+#ifndef __GLIBC__
+#include "common/drand48-compat.h"
+#endif
+
 #include "net/net-events.h"
 #include "net/net-msg.h"
 #include "net/net-timers.h"

@@ -12,7 +12,7 @@ ifeq ($m, 64)
 ARCH = -m64
 endif
 
-CFLAGS = $(ARCH) -O3 -std=gnu11 -Wall -Wno-array-bounds -mpclmul -march=core2 -mfpmath=sse -mssse3 -fno-strict-aliasing -fno-strict-overflow -fwrapv -DAES=1 -DCOMMIT=\"${COMMIT}\" -D_GNU_SOURCE=1 -D_FILE_OFFSET_BITS=64
+CFLAGS = $(ARCH) -O3 -std=gnu11 -Wall -Wextra -Wno-unused-parameter -Wno-error=array-bounds -Wno-error=incompatible-pointer-types -mpclmul -march=core2 -mfpmath=sse -mssse3 -fno-strict-aliasing -fno-strict-overflow -fwrapv -DAES=1 -DCOMMIT=\"${COMMIT}\" -D_GNU_SOURCE=1 -D_FILE_OFFSET_BITS=64
 LDFLAGS = $(ARCH) -ggdb -rdynamic -lm -lrt -lcrypto -lz -lpthread -lcrypto
 
 LIB = ${OBJ}/lib
@@ -40,6 +40,7 @@ DEPENDENCE_STRANGE	:=	$(subst ${OBJ}/,${DEP}/,$(patsubst %.o,%.d,${OBJECTS_STRAN
 DEPENDENCE_NORM	:=	$(subst ${OBJ}/,${DEP}/,$(patsubst %.o,%.d,${OBJECTS}))
 
 LIB_OBJS_NORMAL := \
+	${OBJ}/common/drand48-compat.o \
 	${OBJ}/common/crc32c.o \
 	${OBJ}/common/pid.o \
 	${OBJ}/common/sha1.o \
