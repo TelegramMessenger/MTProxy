@@ -87,6 +87,11 @@ static int default_parse_option (int val) {
 
 /* {{{ SIGNAL ACTIONS */
 static void default_sighup (void) {
+  int res = do_reload_config (0x4);
+
+  if (res < 0) {
+    fprintf (stderr, "config check failed! (code %d)\n", res);
+  }
 }
 
 static void default_sigusr1 (void) {
