@@ -1,0 +1,9 @@
+{
+    "makefile.launchConfigurations": [
+        {
+            "cwd": "/workspaces/MTProxy/objs/bin",
+            "binaryPath": "/workspaces/MTProxy/objs/bin/mtproto-proxy",
+            "binaryArgs": []
+        }
+    ]
+}
