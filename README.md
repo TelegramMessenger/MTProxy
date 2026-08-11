@@ -7,7 +7,7 @@ Install dependencies, you would need common set of tools for building from sourc
 On Debian/Ubuntu:
 ```bash
 apt install git curl build-essential libssl-dev zlib1g-dev
-```
+``` 
 On CentOS/RHEL:
 ```bash
 yum install openssl-devel zlib-devel
