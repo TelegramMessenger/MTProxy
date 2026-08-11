@@ -403,7 +403,7 @@ int precise_cron_job_run (job_t job, int op, struct job_thread *JT) /* {{{ */ {
   }
 
   do_precise_cron ();
-  job_timer_insert (job, precise_now + 0.001 * (1 + drand48_j ()));
+  job_timer_insert (job, precise_now + (1 + drand48_j ()));
   return 0;
 }
 /* }}} */ 
