@@ -130,7 +130,6 @@ typedef struct {
   int required_io_threads;
   int required_cpu_threads;
   int required_tcp_cpu_threads;
-  int required_tcp_io_threads;
   
   char *aes_pwd_file;
 
@@ -196,7 +195,6 @@ ENGINE_INT_PARAM(backlog,backlog);
 ENGINE_INT_PARAM(required_io_threads,required_io_threads);
 ENGINE_INT_PARAM(required_cpu_threads,required_cpu_threads);
 ENGINE_INT_PARAM(required_tcp_cpu_threads,required_tcp_cpu_threads);
-ENGINE_INT_PARAM(required_tcp_io_threads,required_tcp_io_threads);
 
 void reopen_logs (void);
 int default_main (server_functions_t *F, int argc, char *argv[]);

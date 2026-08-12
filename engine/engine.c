@@ -257,11 +257,7 @@ void engine_init (const char *const pwd_filename, int do_not_open_port) {
       nc = 1;
     }
     create_new_job_class (JC_CONNECTION, nc, nc);
-    nc = engine_get_required_tcp_io_threads ();
-    if (nc <= 0) {
-      nc = 1;
-    }
-    create_new_job_class (JC_CONNECTION_IO, nc, nc);
+    create_new_job_class (JC_CONNECTION_IO, 1, 1);
     create_new_job_class (JC_ENGINE, 1, 1);
   }
 
@@ -668,9 +664,6 @@ static int f_parse_option_engine (int val) {
     case 301:
       engine_set_required_tcp_cpu_threads (atoi (optarg));
       break;
-    case 302:
-      engine_set_required_tcp_io_threads (atoi (optarg));
-      break;
     default:
       return -1;
   }
@@ -695,7 +688,6 @@ void engine_add_engine_parse_options (void) {
   parse_option_engine_builtin ("io-threads", required_argument, 0, 228, LONGOPT_JOBS_SET,  "Number of I/O threads (1-64, default 16)");
   parse_option_engine_builtin ("multithread", optional_argument, 0, 258, LONGOPT_JOBS_SET, "run in multithread mode");
   parse_option_engine_builtin ("tcp-cpu-threads", required_argument, 0, 301, LONGOPT_JOBS_SET, "number of tcp-cpu threads");
-  parse_option_engine_builtin ("tcp-iothreads", required_argument, 0, 302, LONGOPT_JOBS_SET, "number of tcp-io threads");
 }
 
 void default_parse_extra_args (int argc, char *argv[]) /* {{{ */ {
