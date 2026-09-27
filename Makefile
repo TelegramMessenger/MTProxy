@@ -12,8 +12,16 @@ ifeq ($m, 64)
 ARCH = -m64
 endif
 
+STATIC = 
+STATIC_LIBS = 
+LDFLAGS_EXTRA = 
+ifeq ($(static), 1)
+STATIC = -static
+endif
+
 CFLAGS = $(ARCH) -O3 -std=gnu11 -Wall -Wno-array-bounds -mpclmul -march=core2 -mfpmath=sse -mssse3 -fno-strict-aliasing -fno-strict-overflow -fwrapv -DAES=1 -DCOMMIT=\"${COMMIT}\" -D_GNU_SOURCE=1 -D_FILE_OFFSET_BITS=64
-LDFLAGS = $(ARCH) -ggdb -rdynamic -lm -lrt -lcrypto -lz -lpthread -lcrypto
+NSS_LIBS = 
+LDFLAGS = $(ARCH) $(STATIC) -ggdb -lm -lrt $(STATIC_LIBS) -lcrypto -lz -lzstd -lpthread -ldl $(NSS_LIBS) $(LDFLAGS_EXTRA)
 
 LIB = ${OBJ}/lib
 CINCLUDE = -iquote common -iquote .

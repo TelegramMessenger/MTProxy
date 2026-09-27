@@ -28,7 +28,29 @@ make && cd objs/bin
 
 If the build has failed, you should run `make clean` before building it again.
 
+
+
+## Building In docker
+
+Normally:
+
+```
+docker build -t mtproxy .
+```
+
+When setting up a proxy to build:
+
+- APT_MIRROR: Specifies the Ubuntu mirror source.
+- APT_HTTPPROXY:  Sets a proxy for curl to download Telegram configurations.
+
+```
+docker build -t mtproxy --build-arg APT_MIRROR=mirrors.aliyun.com --build-arg APT_HTTPPROXY=http://192.168.18.1:10811 .
+```
+
+
+
 ## Running
+
 1. Obtain a secret, used to connect to telegram servers.
 ```bash
 curl -s https://core.telegram.org/getProxySecret -o proxy-secret

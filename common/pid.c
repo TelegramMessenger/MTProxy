@@ -38,7 +38,10 @@ npid_t PID;
 
 void init_common_PID (void) {
   if (!PID.pid) {
-    PID.pid = (unsigned short) getpid ();
+    int p = getpid ();
+    // 将PID截断到16位以兼容旧的数据结构设计
+    // 现代Linux系统的PID可能超过65535，但协议中pid字段只有16位
+    PID.pid = p & 0xffff;
   }
   if (!PID.utime) {
     PID.utime = time (0);
