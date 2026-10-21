@@ -105,6 +105,7 @@ int allocated_targets, active_targets, inactive_targets, free_targets;
 int allocated_connections, allocated_socket_connections;
 long long accept_calls_failed, accept_nonblock_set_failed, accept_connection_limit_failed,
           accept_rate_limit_failed, accept_init_accepted_failed;
+long long connections_failed_no_buffers;
 
 long long tcp_readv_calls, tcp_writev_calls, tcp_readv_intr, tcp_writev_intr;
 long long tcp_readv_bytes, tcp_writev_bytes;
@@ -169,6 +170,7 @@ MODULE_STAT_FUNCTION
   SB_SUM_ONE_LL (accept_connection_limit_failed);
   SB_SUM_ONE_LL (accept_rate_limit_failed);
   SB_SUM_ONE_LL (accept_init_accepted_failed);
+  SB_SUM_ONE_LL (connections_failed_no_buffers);
 MODULE_STAT_FUNCTION_END
 
 void fetch_connections_stat (struct connections_stat *st) {
@@ -200,6 +202,7 @@ void fetch_connections_stat (struct connections_stat *st) {
   COLLECT_LL (accept_rate_limit_failed);
   COLLECT_LL (accept_init_accepted_failed);
   COLLECT_LL (accept_connection_limit_failed);
+  COLLECT_LL (connections_failed_no_buffers);
 #undef COLLECT_I
 #undef COLLECT_LL
 }
@@ -378,6 +381,19 @@ void fail_connection (connection_job_t C, int err) /* {{{ */ {
     }
 
     job_signal (JOB_REF_CREATE_PASS (C), JS_ABORT);
+  }
+}
+/* }}} */
+
+void (*connections_no_buffers_callback) (void);
+
+// the message buffer pool is exhausted and the connection can't proceed without a new buffer:
+// close it instead of aborting the whole process, and let the application reclaim buffers right away
+void fail_connection_no_buffers (connection_job_t C) /* {{{ */ {
+  MODULE_STAT->connections_failed_no_buffers ++;
+  fail_connection (C, -501);
+  if (connections_no_buffers_callback) {
+    connections_no_buffers_callback ();
   }
 }
 /* }}} */
@@ -893,6 +909,38 @@ int net_server_socket_reader (socket_connection_job_t C) /* {{{ */ {
     }
 
     MODULE_STAT->tcp_readv_bytes += r;
+
+    // the buffers filled by readv() become parts of the message, so they must be replaced before the message is built.
+    // If the message buffer pool is exhausted, the received data is dropped and the connection is closed: the receive
+    // buffers stay intact for other connections and closing this one frees its buffers
+    int used = 0, left = r;
+    while (left > 0) {
+      left -= left > (int) tcp_recv_iovec[used + 1].iov_len ? (int) tcp_recv_iovec[used + 1].iov_len : left;
+      used ++;
+    }
+    assert (used >= 1 && used <= MAX_TCP_RECV_BUFFERS);
+    struct msg_buffer *new_buffers[MAX_TCP_RECV_BUFFERS];
+    int i;
+    for (i = 0; i < used; i++) {
+      new_buffers[i] = alloc_msg_buffer (tcp_recv_buffers[i], TCP_RECV_BUFFER_SIZE);
+      if (!new_buffers[i]) {
+        break;
+      }
+    }
+    if (i < used) {
+      while (i > 0) {
+        msg_buffer_decref (new_buffers[--i]);
+      }
+      rwm_free (in);
+      free (in);
+      vkprintf (1, "cannot allocate tcp receive buffer, closing connection %d (%s)\n", c->fd, show_remote_socket_ip (C));
+      assert (c->conn);
+      fail_connection_no_buffers (c->conn);
+      job_signal (JOB_REF_CREATE_PASS (C), JS_ABORT);
+      __sync_fetch_and_or (&c->flags, C_NET_FAILED);
+      return 0;
+    }
+
     struct msg_part *mp = 0;
     assert (p == 1);
     mp = new_msg_part (0, tcp_recv_buffers[p - 1]);
@@ -919,17 +967,12 @@ int net_server_socket_reader (socket_connection_job_t C) /* {{{ */ {
       p ++;
     }
     assert (!rs);
+    assert (p - 1 == used);
 
-    int i;
-    for (i = 0; i < p - 1; i++) {
-      struct msg_buffer *X = alloc_msg_buffer (tcp_recv_buffers[i], TCP_RECV_BUFFER_SIZE);
-      if (!X) {
-        vkprintf (0, "**FATAL**: cannot allocate tcp receive buffer\n");
-        assert (0);
-      }
-      tcp_recv_buffers[i] = X;
-      tcp_recv_iovec[i + 1].iov_base = X->data;
-      tcp_recv_iovec[i + 1].iov_len = X->chunk->buffer_size;
+    for (i = 0; i < used; i++) {
+      tcp_recv_buffers[i] = new_buffers[i];
+      tcp_recv_iovec[i + 1].iov_base = new_buffers[i]->data;
+      tcp_recv_iovec[i + 1].iov_len = new_buffers[i]->chunk->buffer_size;
     }
 
     assert (c->conn);

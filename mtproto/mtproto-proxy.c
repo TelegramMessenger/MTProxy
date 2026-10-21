@@ -491,6 +491,7 @@ static inline void add_stats (struct worker_stats *W) {
   UPD (conn.accept_nonblock_set_failed);
   UPD (conn.accept_rate_limit_failed);
   UPD (conn.accept_init_accepted_failed);
+  UPD (conn.connections_failed_no_buffers);
 
   UPD (allocated_aes_crypto); 
   UPD (allocated_aes_crypto_temp); 
@@ -627,6 +628,7 @@ void mtfront_prepare_stats (stats_buffer_t *sb) {
 	     "total_special_connections\t%d\n"
 	     "total_max_special_connections\t%d\n"
 	     "total_accept_connections_failed\t%lld %lld %lld %lld %lld\n"
+	     "total_connections_failed_no_buffers\t%lld\n"
 	     "ext_connections\t%lld\n"
 	     "ext_connections_created\t%lld\n"
 	     "total_active_network_events\t%d\n"
@@ -693,6 +695,7 @@ void mtfront_prepare_stats (stats_buffer_t *sb) {
 	     S(conn.accept_connection_limit_failed),
 	     S(conn.accept_rate_limit_failed),
 	     S(conn.accept_nonblock_set_failed),
+	     S(conn.connections_failed_no_buffers),
 	     S(ext_connections),
 	     S(ext_connections_created),
 	     S(ev_heap_size),
@@ -1926,6 +1929,33 @@ void check_all_conn_buffers (void) {
   }
 }
 
+// check_all_conn_buffers() is normally run once per second from cron(), which leaves up to a second during which
+// every connection that receives data is closed by fail_connection_no_buffers(), while the connections holding
+// the buffers are untouched. So when the pool is found exhausted, run it from a JC_ENGINE job right away (cron()
+// itself runs in that class, so ConnLRU is accessed from the same class). A burst of failures schedules it once.
+static int reclaim_buffers_scheduled;
+
+static int reclaim_buffers_job_run (job_t job, int op, struct job_thread *JT) {
+  switch (op) {
+  case JS_RUN:
+    __sync_bool_compare_and_swap (&reclaim_buffers_scheduled, 1, 0);
+    check_all_conn_buffers ();
+    return JOB_COMPLETED;
+  case JS_FINISH:
+    assert (job->j_refcnt == 1);
+    return job_free (JOB_REF_PASS (job));
+  default:
+    assert (0);
+  }
+}
+
+static void schedule_buffers_reclaim (void) {
+  if (__sync_bool_compare_and_swap (&reclaim_buffers_scheduled, 0, 1)) {
+    job_t job = create_async_job (reclaim_buffers_job_run, JSC_ALLOW (JC_ENGINE, JS_RUN) | JSIG_FAST (JS_FINISH), -1, 0, 0, JOB_REF_NULL);
+    schedule_job (JOB_REF_PASS (job));
+  }
+}
+
 int check_conn_buffers (connection_job_t c) {
   int tot_used_bytes = CONN_INFO(c)->in.total_bytes + CONN_INFO(c)->in_u.total_bytes + CONN_INFO(c)->out.total_bytes + CONN_INFO(c)->out_p.total_bytes;
   if (tot_used_bytes > MAX_CONNECTION_BUFFER_SPACE) {
@@ -1950,6 +1980,7 @@ int mtfront_data_sent (connection_job_t c, int bytes_sent) {
 }
 
 void init_ct_server_mtfront (void) {
+  connections_no_buffers_callback = schedule_buffers_reclaim;
   assert (check_conn_functions (&ct_http_server, 1) >= 0);
   memcpy (&ct_http_server_mtfront, &ct_http_server, sizeof (conn_type_t));
   memcpy (&ct_tcp_rpc_ext_server_mtfront, &ct_tcp_rpc_ext_server, sizeof (conn_type_t));
