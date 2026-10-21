@@ -985,10 +985,14 @@ static int proxy_connection (connection_job_t C, const struct domain_info *info)
 int tcp_rpcs_ext_alarm (connection_job_t C) {
   struct tcp_rpc_data *D = TCP_RPC_DATA (C);
   if (D->in_packet_num == -3 && default_domain_info != NULL) {
-    return proxy_connection (C, default_domain_info);  
-  } else {
-    return 0;
+    return proxy_connection (C, default_domain_info);
   }
+  if (D->in_packet_num <= 0) {
+    struct connection_info *c = CONN_INFO (C);
+    vkprintf (1, "closing connection #%d from %s:%d: no complete packet received within the initial deadline\n", c->fd, show_remote_ip (C), c->remote_port);
+    fail_connection (C, -1);
+  }
+  return 0;
 }
 
 int tcp_rpcs_ext_init_accepted (connection_job_t C) {
@@ -1002,7 +1006,7 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
 
   struct tcp_rpc_data *D = TCP_RPC_DATA (C);
   if (D->crypto_flags & RPCF_COMPACT_OFF) {
-    if (D->in_packet_num != -3) {
+    if (D->in_packet_num > 0) {
       job_timer_remove (C);
     }
     return tcp_rpcs_parse_execute (C);
@@ -1014,7 +1018,7 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
   vkprintf (4, "%s. in_total_bytes = %d\n", __func__, c->in.total_bytes);
 
   while (1) {
-    if (D->in_packet_num != -3) {
+    if (D->in_packet_num > 0) {
       job_timer_remove (C);
     }
     if (c->flags & C_ERROR) {
