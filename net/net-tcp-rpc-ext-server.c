@@ -1011,7 +1011,7 @@ static int is_allowed_timestamp (int timestamp) {
   // the allowed error must be big enough to allow requests after time synchronization
   const int MAX_ALLOWED_TIMESTAMP_ERROR = 10 * 60;
   if (timestamp > now - MAX_ALLOWED_TIMESTAMP_ERROR) {
-    // this can happen only first (MAX_ALLOWED_TIMESTAMP_ERROR + 3) sceonds after first_client_random->time
+    // this can happen only first (MAX_ALLOWED_TIMESTAMP_ERROR + 3) seconds after first_client_random->time
     vkprintf (1, "Allow recent request with timestamp %d without full check for client random duplication\n", timestamp);
     return 1;
   }
@@ -1239,7 +1239,6 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
           vkprintf (1, "Receive again request with the same client random\n");
           RETURN_TLS_ERROR(info);
         }
-        add_client_random (client_random);
         delete_old_client_randoms();
 
         unsigned char expected_random[32];
@@ -1254,6 +1253,11 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
           vkprintf (1, "Receive request with unmatched client random\n");
           RETURN_TLS_ERROR(info);
         }
+        // the request is authenticated: remember its client random before the timestamp check, so that a request
+        // rejected only because of its timestamp can't be repeated later, when its timestamp becomes acceptable.
+        // Requests with an unmatched client random are intentionally not remembered: they can't become valid
+        // without a restart, which empties the cache anyway, so remembering them would only let anyone grow it
+        add_client_random (client_random);
         int timestamp = *(int *)(expected_random + 28) ^ *(int *)(client_random + 28);
         if (!is_allowed_timestamp (timestamp)) {
           RETURN_TLS_ERROR(info);
