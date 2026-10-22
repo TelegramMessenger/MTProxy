@@ -1816,6 +1816,7 @@ int forward_tcp_query (struct tl_in_state *tlio_in, connection_job_t c, conn_tar
     flags |= 8;
   }
 
+  int tls_res;
   TLS_START (JOB_REF_PASS (d)); // open tlio_out context
 
   tl_store_int (RPC_PROXY_REQ);
@@ -1867,7 +1868,15 @@ int forward_tcp_query (struct tl_in_state *tlio_in, connection_job_t c, conn_tar
   int len = TL_IN_REMAINING;
   assert (tl_copy_through (tlio_in, tlio_out, len, 1) == len);
 
-  TLS_END;   // close tlio_out context
+  tls_res = tl_store_end_ext (0);
+  tls_pop ();   // close tlio_out context
+  if (tls_res < 0) {
+    // the request could not be serialized because the message buffer pool was exhausted. It was dropped
+    // before being queued, so the shared middle-end stream is not desynced and must not be closed; fail
+    // the originating client connection instead.
+    fail_connection_no_buffers (c);
+    return 0;
+  }
 
   if (CONN_INFO(c)->type == &ct_http_server_mtfront) {
     assert (CONN_INFO(c)->pending_queries >= 0);

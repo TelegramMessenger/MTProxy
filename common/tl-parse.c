@@ -758,6 +758,7 @@ static inline int __tl_store_init (struct tl_out_state *tlio_out, void *out, voi
   assert (tlio_out);
   assert (!TL_OUT_METHODS); 
   
+  tlio_out->out_no_buffers = 0;
   TL_OUT = out;
   TL_OUT_EXTRA = out_extra;
   if (out) {
@@ -776,7 +777,6 @@ static inline int __tl_store_init (struct tl_out_state *tlio_out, void *out, voi
 
   tlio_out->errnum = 0;
   tlio_out->error = NULL;
-  tlio_out->out_no_buffers = 0;
 
   return 0;
 }
@@ -879,15 +879,15 @@ int tls_header (struct tl_out_state *tlio_out, struct tl_query_header *header) {
   return 0;
 }
 
-// the message buffer pool was exhausted while serializing: drop the message and fail the destination
-// connection (for tcp types). We cannot build/send an RPC_REQ_ERROR reply here, because that needs buffers too.
+// The message buffer pool was exhausted while serializing. Drop the message without sending it and
+// report the drop (-1). The RPC framing (length, sequence number, CRC) is only added at write time by
+// tcp_rpc_write_packet, so a message dropped before it is queued cannot desync the destination stream;
+// we must NOT close the destination connection here, because for a forwarded request it is the shared
+// middle-end connection. The caller decides whether to fail the originating (client) connection.
 static int tls_drop_no_buffers (struct tl_out_state *tlio_out) {
   vkprintf (1, "tl_store_end: message buffer pool exhausted, dropping message, qid = %lld\n", TL_OUT_QID);
-  if (TL_OUT_TYPE == tl_type_tcp_raw_msg && TL_OUT_EXTRA) {
-    fail_connection_no_buffers (TL_OUT_EXTRA);
-  }
   tl_store_clear ();
-  return 0;
+  return -1;
 }
 
 int tls_end_ext (struct tl_out_state *tlio_out, int op) {
