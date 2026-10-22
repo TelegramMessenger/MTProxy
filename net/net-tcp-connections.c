@@ -64,8 +64,12 @@ int cpu_tcp_server_writer (connection_job_t C) /* {{{ */ {
     struct raw_message *raw = mpq_pop_nw (c->out_queue, 4);
     if (!raw) { break; }
     //rwm_union (out, raw);
-    c->type->write_packet (C, raw);
+    int wp = c->type->write_packet (C, raw);
     free (raw);
+    if (wp < 0) {
+      // write_packet failed the connection because the message buffer pool is exhausted; stop sending
+      break;
+    }
   }
   
   c->type->flush (C);

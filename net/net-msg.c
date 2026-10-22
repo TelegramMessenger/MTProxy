@@ -516,7 +516,13 @@ int rwm_push_data_front (struct raw_message *raw, const void *data, int alloc_by
   }
   while (alloc_bytes) {
     struct msg_buffer *X = alloc_msg_buffer (raw->first ? raw->first->part : 0, alloc_bytes >= MSG_SMALL_BUFFER ? MSG_STD_BUFFER : MSG_SMALL_BUFFER);
-    assert (X);
+    if (!X) {
+      // message buffer pool exhausted: return the number of bytes actually prepended (< requested).
+      // A short front prepend leaves the message missing its leading bytes, so callers must treat any
+      // shortfall as a failure rather than send a truncated packet.
+      if (locked) { locked->magic = MSG_PART_MAGIC; }
+      return r - alloc_bytes;
+    }
     int size = X->chunk->buffer_size;
     mp = new_msg_part (raw->first, X);
     mp->next = raw->first;

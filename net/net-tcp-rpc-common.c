@@ -52,9 +52,19 @@ void tcp_rpc_conn_send_init (connection_job_t C, struct raw_message *raw, int fl
   } else {
     *r = *raw;
   }
-  rwm_push_data_front (r, Q, 8);
+  if (rwm_push_data_front (r, Q, 8) != 8) {
+    rwm_free (r);
+    free (r);
+    fail_connection_no_buffers (C);
+    return;
+  }
   unsigned crc32 = rwm_custom_crc32 (r, r->total_bytes, TCP_RPC_DATA(C)->custom_crc_partial);
-  rwm_push_data (r, &crc32, 4);
+  if (rwm_push_data (r, &crc32, 4) != 4) {
+    rwm_free (r);
+    free (r);
+    fail_connection_no_buffers (C);
+    return;
+  }
 
   socket_connection_job_t S = c->io_conn;
 
@@ -77,9 +87,21 @@ void tcp_rpc_conn_send_im (JOB_REF_ARG (C), struct raw_message *raw, int flags) 
   } else {
     *r = *raw;
   }
-  rwm_push_data_front (r, Q, 8);
+  if (rwm_push_data_front (r, Q, 8) != 8) {
+    rwm_free (r);
+    free (r);
+    fail_connection_no_buffers (C);
+    job_signal (JOB_REF_PASS (C), JS_RUN);
+    return;
+  }
   unsigned crc32 = rwm_custom_crc32 (r, r->total_bytes, TCP_RPC_DATA(C)->custom_crc_partial);
-  rwm_push_data (r, &crc32, 4);
+  if (rwm_push_data (r, &crc32, 4) != 4) {
+    rwm_free (r);
+    free (r);
+    fail_connection_no_buffers (C);
+    job_signal (JOB_REF_PASS (C), JS_RUN);
+    return;
+  }
 
   rwm_union (&c->out, r);
   free (r);
@@ -162,9 +184,17 @@ int tcp_rpc_write_packet (connection_job_t C, struct raw_message *raw) {
     Q[0] = raw->total_bytes + 12;
     Q[1] = TCP_RPC_DATA(C)->out_packet_num ++;
   
-    rwm_push_data_front (raw, Q, 8);
+    if (rwm_push_data_front (raw, Q, 8) != 8) {
+      rwm_free (raw);
+      fail_connection_no_buffers (C);
+      return -1;
+    }
     unsigned crc32 = rwm_custom_crc32 (raw, raw->total_bytes, TCP_RPC_DATA(C)->custom_crc_partial);
-    rwm_push_data (raw, &crc32, 4);
+    if (rwm_push_data (raw, &crc32, 4) != 4) {
+      rwm_free (raw);
+      fail_connection_no_buffers (C);
+      return -1;
+    }
   
     rwm_union (&CONN_INFO(C)->out, raw);
   }
@@ -193,7 +223,11 @@ int tcp_rpc_write_packet_compact (connection_job_t C, struct raw_message *raw) {
   if (TCP_RPC_DATA(C)->flags & RPC_F_PAD) {
     int x = lrand48_j();
     int y = lrand48_j() & 3;
-    assert (rwm_push_data (raw, &x, y) == y);
+    if (rwm_push_data (raw, &x, y) != y) {
+      rwm_free (raw);
+      fail_connection_no_buffers (C);
+      return -1;
+    }
   }
 
   int len = raw->total_bytes;
@@ -201,14 +235,20 @@ int tcp_rpc_write_packet_compact (connection_job_t C, struct raw_message *raw) {
   if (!(TCP_RPC_DATA(C)->flags & RPC_F_PAD)) {
     assert (!(len & 3));
   }
+  int short_prepend;
   if (TCP_RPC_DATA(C)->flags & RPC_F_MEDIUM) {
-    rwm_push_data_front (raw, &len, 4);
+    short_prepend = rwm_push_data_front (raw, &len, 4) != 4;
   } else if (len <= 0x7e * 4) {
     len >>= 2;
-    rwm_push_data_front (raw, &len, 1);
+    short_prepend = rwm_push_data_front (raw, &len, 1) != 1;
   } else {
     len = (len << 6) | 0x7f;
-    rwm_push_data_front (raw, &len, 4);
+    short_prepend = rwm_push_data_front (raw, &len, 4) != 4;
+  }
+  if (short_prepend) {
+    rwm_free (raw);
+    fail_connection_no_buffers (C);
+    return -1;
   }
   rwm_union (&CONN_INFO(C)->out, raw);
 
