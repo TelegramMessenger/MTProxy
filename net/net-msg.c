@@ -599,7 +599,10 @@ void *rwm_prepend_alloc (struct raw_message *raw, int alloc_bytes) /* {{{ */ {
 
   assert (raw->first_offset == raw->first->offset);
   struct msg_buffer *X = alloc_msg_buffer (raw->first ? raw->first->part : 0, alloc_bytes);
-  assert (X);  
+  if (!X) {
+    if (locked) { locked->magic = MSG_PART_MAGIC; }
+    return 0;
+  }
   int size = X->chunk->buffer_size;
   assert (size >= alloc_bytes);
   struct msg_part *mp = new_msg_part (raw->first, X);
@@ -641,7 +644,10 @@ void *rwm_postpone_alloc (struct raw_message *raw, int alloc_bytes) /* {{{ */ {
     return mp->part->data + mp->data_end - alloc_bytes;
   }
   struct msg_buffer *X = alloc_msg_buffer (mp->part, alloc_bytes);
-  assert (X);
+  if (!X) {
+    if (locked) { locked->magic = MSG_PART_MAGIC; }
+    return 0;
+  }
   size = X->chunk->buffer_size;
   assert (size >= alloc_bytes);
   

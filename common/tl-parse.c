@@ -190,16 +190,37 @@ static inline void __tl_raw_msg_fetch_mark_delete (struct tl_in_state *tlio_in) 
   TL_IN_MARK = 0;
 }
 
+// Returned by the raw-message store methods when the message buffer pool is exhausted mid-serialization,
+// so the caller can still write harmlessly; the output is marked out_no_buffers and dropped in
+// tls_end_ext without being sent. Per-thread so concurrent writers never share it.
+static void *tl_store_throwaway_ptr (int len) {
+  static __thread char buf[MSG_STD_BUFFER] __attribute__ ((aligned (16)));
+  assert (len >= 0 && len <= MSG_STD_BUFFER);
+  return buf;
+}
+
 static inline void *__tl_raw_msg_store_get_ptr (struct tl_out_state *tlio_out, int len) {
-  return rwm_postpone_alloc (TL_OUT_RAW_MSG, len);
+  void *p = rwm_postpone_alloc (TL_OUT_RAW_MSG, len);
+  if (!p) {
+    tlio_out->out_no_buffers = 1;
+    return tl_store_throwaway_ptr (len);
+  }
+  return p;
 }
 
 static inline void *__tl_raw_msg_store_get_prepend_ptr (struct tl_out_state *tlio_out, int len) {
-  return rwm_prepend_alloc (TL_OUT_RAW_MSG, len);
+  void *p = rwm_prepend_alloc (TL_OUT_RAW_MSG, len);
+  if (!p) {
+    tlio_out->out_no_buffers = 1;
+    return tl_store_throwaway_ptr (len);
+  }
+  return p;
 }
 
 static inline void __tl_raw_msg_store_raw_data (struct tl_out_state *tlio_out, const void *buf, int len) {
-  assert (rwm_push_data (TL_OUT_RAW_MSG, buf, len) == len);
+  if (rwm_push_data (TL_OUT_RAW_MSG, buf, len) != len) {
+    tlio_out->out_no_buffers = 1;
+  }
 }
 
 static inline void __tl_raw_msg_store_raw_msg (struct tl_out_state *tlio_out, struct raw_message *raw) {
@@ -755,6 +776,7 @@ static inline int __tl_store_init (struct tl_out_state *tlio_out, void *out, voi
 
   tlio_out->errnum = 0;
   tlio_out->error = NULL;
+  tlio_out->out_no_buffers = 0;
 
   return 0;
 }
@@ -857,12 +879,26 @@ int tls_header (struct tl_out_state *tlio_out, struct tl_query_header *header) {
   return 0;
 }
 
+// the message buffer pool was exhausted while serializing: drop the message and fail the destination
+// connection (for tcp types). We cannot build/send an RPC_REQ_ERROR reply here, because that needs buffers too.
+static int tls_drop_no_buffers (struct tl_out_state *tlio_out) {
+  vkprintf (1, "tl_store_end: message buffer pool exhausted, dropping message, qid = %lld\n", TL_OUT_QID);
+  if (TL_OUT_TYPE == tl_type_tcp_raw_msg && TL_OUT_EXTRA) {
+    fail_connection_no_buffers (TL_OUT_EXTRA);
+  }
+  tl_store_clear ();
+  return 0;
+}
+
 int tls_end_ext (struct tl_out_state *tlio_out, int op) {
   if (TL_OUT_TYPE == tl_type_none) {
     return 0;
   }
   assert (TL_OUT);  
   assert (TL_OUT_TYPE);
+  if (tlio_out->out_no_buffers) {
+    return tls_drop_no_buffers (tlio_out);
+  }
   if (tlio_out->error) {
 //    tl_store_clear ();    
     tl_store_clean ();
@@ -906,6 +942,9 @@ int tls_end_ext (struct tl_out_state *tlio_out, int op) {
   }
 
   if (!(TL_OUT_FLAGS & TLF_NO_AUTOFLUSH)) {
+    if (tlio_out->out_no_buffers) {
+      return tls_drop_no_buffers (tlio_out);
+    }
     TL_OUT_METHODS->store_flush (tlio_out);
   }
   vkprintf (2, "tl_store_end: written %d bytes, qid = %lld, PID = " PID_PRINT_STR "\n", TL_OUT_POS, TL_OUT_QID, PID_TO_PRINT (TL_OUT_PID));

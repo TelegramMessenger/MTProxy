@@ -128,6 +128,7 @@ struct tl_out_state {
 
   char *error;
   int errnum;
+  int out_no_buffers; // set when the message buffer pool was exhausted during serialization; tls_end_ext then drops the message and fails the destination connection instead of sending it
 
   long long out_qid;
 

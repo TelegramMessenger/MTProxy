@@ -93,7 +93,11 @@ int cpu_tcp_server_writer (connection_job_t C) /* {{{ */ {
     rwm_init (&c->out, 0);
   }
  
+  // socket-side bytes already queued, plus the batch we are about to hand off (the socket has not
+  // merged it into its out yet), so a connection's most recent burst is not missed
+  int queued_socket_out = c->io_conn ? SOCKET_CONN_INFO(c->io_conn)->out.total_bytes : 0;
   if (raw->total_bytes && c->io_conn) {        
+    queued_socket_out += raw->total_bytes;
     mpq_push_w (SOCKET_CONN_INFO(c->io_conn)->out_packet_queue, raw, 0);
     if (stop) {
       __sync_fetch_and_or (&SOCKET_CONN_INFO(c->io_conn)->flags, C_STOPWRITE);
@@ -108,7 +112,7 @@ int cpu_tcp_server_writer (connection_job_t C) /* {{{ */ {
   // job where c->io_conn is guaranteed alive (its reference is only passed away by this connection's
   // own close). The reclaimer must not dereference the socket itself: holding the connection does not
   // keep its socket connection alive.
-  __atomic_store_n (&c->queued_socket_out_bytes, c->io_conn ? SOCKET_CONN_INFO(c->io_conn)->out.total_bytes : 0, __ATOMIC_RELAXED);
+  __atomic_store_n (&c->queued_socket_out_bytes, queued_socket_out, __ATOMIC_RELAXED);
 
   return 0;
 }
