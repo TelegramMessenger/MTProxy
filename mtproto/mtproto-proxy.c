@@ -795,31 +795,55 @@ void push_rpc_confirmation (JOB_REF_ARG (C), int confirm) {
 
   if ((lrand48_j() & 1) || !(TCP_RPC_DATA(C)->flags & RPC_F_PAD)) {
     struct raw_message *msg = malloc (sizeof (struct raw_message));
-    rwm_create (msg, "\xdd", 1);
-    rwm_push_data (msg, &confirm, 4);
+    if (rwm_create (msg, "\xdd", 1) != 1 || rwm_push_data (msg, &confirm, 4) != 4) {
+      rwm_free (msg);
+      free (msg);
+      fail_connection_no_buffers (C);
+      job_signal (JOB_REF_PASS (C), JS_RUN);
+      return;
+    }
     mpq_push_w (CONN_INFO(C)->out_queue, msg, 0);
     job_signal (JOB_REF_PASS (C), JS_RUN);
   } else {
     int x = -1;
     struct raw_message m;
-    assert (rwm_create (&m, &x, 4) == 4);
-    assert (rwm_push_data (&m, &confirm, 4) == 4);
+    if (rwm_create (&m, &x, 4) != 4 || rwm_push_data (&m, &confirm, 4) != 4) {
+      rwm_free (&m);
+      fail_connection_no_buffers (C);
+      job_signal (JOB_REF_PASS (C), JS_RUN);
+      return;
+    }
 
     int z = lrand48_j() & 1;
     while (z-- > 0) {
       int t = lrand48_j();
-      assert (rwm_push_data (&m, &t, 4) == 4);
+      if (rwm_push_data (&m, &t, 4) != 4) {
+        rwm_free (&m);
+        fail_connection_no_buffers (C);
+        job_signal (JOB_REF_PASS (C), JS_RUN);
+        return;
+      }
     }
 
     tcp_rpc_conn_send (JOB_REF_CREATE_PASS (C), &m, 0);
 
     x = 0;
-    assert (rwm_create (&m, &x, 4) == 4);
+    if (rwm_create (&m, &x, 4) != 4) {
+      rwm_free (&m);
+      fail_connection_no_buffers (C);
+      job_signal (JOB_REF_PASS (C), JS_RUN);
+      return;
+    }
 
     z = lrand48_j() & 1;
     while (z-- > 0) {
       int t = lrand48_j();
-      assert (rwm_push_data (&m, &t, 4) == 4);
+      if (rwm_push_data (&m, &t, 4) != 4) {
+        rwm_free (&m);
+        fail_connection_no_buffers (C);
+        job_signal (JOB_REF_PASS (C), JS_RUN);
+        return;
+      }
     }
 
     tcp_rpc_conn_send (JOB_REF_PASS (C), &m, 0);

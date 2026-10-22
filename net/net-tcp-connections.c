@@ -67,12 +67,16 @@ int cpu_tcp_server_writer (connection_job_t C) /* {{{ */ {
     int wp = c->type->write_packet (C, raw);
     free (raw);
     if (wp < 0) {
-      // write_packet failed the connection because the message buffer pool is exhausted; stop sending
-      break;
+      // write_packet already failed the connection (message buffer pool exhausted); return now so we
+      // neither flush/encrypt (which would fail again and double-count) nor send partial output
+      return 0;
     }
   }
   
-  c->type->flush (C);
+  if (c->type->flush (C) < 0) {
+    // flush failed the connection while padding the output; don't encrypt or send
+    return 0;
+  }
 
   struct raw_message *raw = malloc (sizeof (*raw));
 
@@ -263,7 +267,10 @@ int cpu_tcp_aes_crypto_ctr128_encrypt_output (connection_job_t C) /* {{{ */ {
       }
 
       unsigned char header[5] = {0x17, 0x03, 0x03, len >> 8, len & 255};
-      rwm_push_data (&c->out_p, header, 5);
+      if (rwm_push_data (&c->out_p, header, 5) != 5) {
+        fail_connection_no_buffers (C);
+        return -1;
+      }
       vkprintf (2, "Send TLS-packet of length %d\n", len);
     }
 

@@ -135,21 +135,35 @@ void tcp_rpc_conn_send (JOB_REF_ARG (C), struct raw_message *raw, int flags) {
 void tcp_rpc_conn_send_data (JOB_REF_ARG (C), int len, void *Q) {
   assert (!(len & 3));
   struct raw_message r;
-  assert (rwm_create (&r, Q, len) == len);
+  if (rwm_create (&r, Q, len) != len) {
+    rwm_free (&r);
+    fail_connection_no_buffers (C);
+    job_signal (JOB_REF_PASS (C), JS_RUN);
+    return;
+  }
   tcp_rpc_conn_send (JOB_REF_PASS (C), &r, 0);
 }
 
 void tcp_rpc_conn_send_data_init (connection_job_t c, int len, void *Q) {
   assert (!(len & 3));
   struct raw_message r;
-  assert (rwm_create (&r, Q, len) == len);
+  if (rwm_create (&r, Q, len) != len) {
+    rwm_free (&r);
+    fail_connection_no_buffers (c);
+    return;
+  }
   tcp_rpc_conn_send_init (c, &r, 0);
 }
 
 void tcp_rpc_conn_send_data_im (JOB_REF_ARG (C), int len, void *Q) {
   assert (!(len & 3));
   struct raw_message r;
-  assert (rwm_create (&r, Q, len) == len);
+  if (rwm_create (&r, Q, len) != len) {
+    rwm_free (&r);
+    fail_connection_no_buffers (C);
+    job_signal (JOB_REF_PASS (C), JS_RUN);
+    return;
+  }
   tcp_rpc_conn_send_im (JOB_REF_PASS (C), &r, 0);
 }
 
@@ -265,7 +279,10 @@ int tcp_rpc_flush (connection_job_t C) {
       assert (!(pad_bytes & 3));
       static const int pad_str[3] = {4, 4, 4};
       assert (pad_bytes <= 12);
-      assert (rwm_push_data (&c->out, pad_str, pad_bytes) == pad_bytes);
+      if (rwm_push_data (&c->out, pad_str, pad_bytes) != pad_bytes) {
+        fail_connection_no_buffers (C);
+        return -1;
+      }
     }
   }
   
