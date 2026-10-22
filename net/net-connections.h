@@ -228,6 +228,7 @@ struct connection_info {
   int error;
   int unread_res_bytes;
   int skip_bytes;
+  int queued_socket_out_bytes; // bytes queued on this connection's socket out, published by its own writer job and read by check_all_conn_buffers() without touching the socket
   int pending_queries;
   int queries_ok;
   char custom_data[CONN_CUSTOM_DATA_BYTES];

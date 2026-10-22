@@ -104,6 +104,12 @@ int cpu_tcp_server_writer (connection_job_t C) /* {{{ */ {
     free (raw);
   }
 
+  // publish the socket-side queued byte count for check_all_conn_buffers(), from the connection's own
+  // job where c->io_conn is guaranteed alive (its reference is only passed away by this connection's
+  // own close). The reclaimer must not dereference the socket itself: holding the connection does not
+  // keep its socket connection alive.
+  __atomic_store_n (&c->queued_socket_out_bytes, c->io_conn ? SOCKET_CONN_INFO(c->io_conn)->out.total_bytes : 0, __ATOMIC_RELAXED);
+
   return 0;
 }
 /* }}} */

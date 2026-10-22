@@ -1947,13 +1947,11 @@ void check_all_conn_buffers (void) {
     connection_job_t d = connection_get_by_fd_generation (Ext->in_fd, Ext->in_gen);
     if (d) {
       int tot_used_bytes = CONN_INFO(d)->in.total_bytes + CONN_INFO(d)->in_u.total_bytes + CONN_INFO(d)->out.total_bytes + CONN_INFO(d)->out_p.total_bytes;
-      // the connection's queued output is encrypted and moved to its socket connection's out; without
-      // counting it the estimate reads ~0 and the loop empties the whole eviction list instead of
-      // stopping once enough has been freed
-      connection_job_t io = CONN_INFO(d)->io_conn;
-      if (io) {
-        tot_used_bytes += SOCKET_CONN_INFO(io)->out.total_bytes;
-      }
+      // the connection's queued output is encrypted and moved to its socket connection's out; count it
+      // too, otherwise the estimate reads ~0 and the loop empties the whole eviction list. The value is
+      // published by the connection's own writer job; we must not dereference the socket here, because
+      // holding d does not keep its socket connection alive.
+      tot_used_bytes += __atomic_load_n (&CONN_INFO(d)->queued_socket_out_bytes, __ATOMIC_RELAXED);
       to_free -= tot_used_bytes * 2;
       fail_connection (d, -500);
       job_decref (JOB_REF_PASS (d));
