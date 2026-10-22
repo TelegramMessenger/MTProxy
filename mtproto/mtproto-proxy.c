@@ -1933,7 +1933,10 @@ void lru_insert_conn (connection_job_t c) {
   }
 }
 
+static double last_reclaim_buffers_time;
+
 void check_all_conn_buffers (void) {
+  last_reclaim_buffers_time = precise_now;
   struct buffers_stat bufs;
   fetch_buffers_stat (&bufs);
   long long max_buffer_memory = bufs.max_buffer_chunks * (long long) MSG_BUFFERS_CHUNK_SIZE;
@@ -1944,6 +1947,13 @@ void check_all_conn_buffers (void) {
     connection_job_t d = connection_get_by_fd_generation (Ext->in_fd, Ext->in_gen);
     if (d) {
       int tot_used_bytes = CONN_INFO(d)->in.total_bytes + CONN_INFO(d)->in_u.total_bytes + CONN_INFO(d)->out.total_bytes + CONN_INFO(d)->out_p.total_bytes;
+      // the connection's queued output is encrypted and moved to its socket connection's out; without
+      // counting it the estimate reads ~0 and the loop empties the whole eviction list instead of
+      // stopping once enough has been freed
+      connection_job_t io = CONN_INFO(d)->io_conn;
+      if (io) {
+        tot_used_bytes += SOCKET_CONN_INFO(io)->out.total_bytes;
+      }
       to_free -= tot_used_bytes * 2;
       fail_connection (d, -500);
       job_decref (JOB_REF_PASS (d));
@@ -1959,11 +1969,18 @@ void check_all_conn_buffers (void) {
 // itself runs in that class, so ConnLRU is accessed from the same class). A burst of failures schedules it once.
 static int reclaim_buffers_scheduled;
 
+// The closed connections free their buffers asynchronously, so an immediate rerun would see the same
+// usage and evict another whole batch. Run the on-demand reclaim at most once per this interval;
+// cron() and the recv-side shedding remain as backstops.
+#define MIN_RECLAIM_BUFFERS_INTERVAL 0.1
+
 static int reclaim_buffers_job_run (job_t job, int op, struct job_thread *JT) {
   switch (op) {
   case JS_RUN:
     __sync_bool_compare_and_swap (&reclaim_buffers_scheduled, 1, 0);
-    check_all_conn_buffers ();
+    if (precise_now - last_reclaim_buffers_time >= MIN_RECLAIM_BUFFERS_INTERVAL) {
+      check_all_conn_buffers ();
+    }
     return JOB_COMPLETED;
   case JS_FINISH:
     assert (job->j_refcnt == 1);
